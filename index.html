@@ -46,6 +46,12 @@
     .field-subject { flex: 1; min-width: 180px; }
     .field-dur-note { font-size: .62rem; color: var(--text3); margin-top: 3px; }
 
+    /* ── Contact bar ── */
+    .contact-bar { max-width: 840px; margin: 0 auto 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .contact-bar > label { font-size: .68rem; color: var(--text3); letter-spacing: .08em; font-weight: 600; white-space: nowrap; margin-right: 2px; }
+    .contact-bar > .preset-sel { min-width: 160px; flex: 0 1 200px; height: 36px; padding: 0 11px; font-size: .82rem; }
+    .contact-hint { font-size: .65rem; color: var(--text3); margin-left: auto; }
+
     /* ── Layout ── */
     .layout { max-width: 840px; margin: 0 auto; display: grid; grid-template-columns: 292px 1fr; gap: 12px; align-items: start; }
     .layout.s2 { grid-template-columns: 1fr 1fr; }
@@ -282,6 +288,17 @@
       </select>
       <span class="field-dur-note">STEP 2 の時間入力に使用</span>
     </div>
+  </div>
+
+  <div class="contact-bar">
+    <label>確認者（任意）</label>
+    <select class="preset-sel" id="contact-sel">
+      <option value="">― なし ―</option>
+    </select>
+    <button class="preset-btn add" id="contact-add">+ 追加</button>
+    <button class="preset-btn" id="contact-rename">改名</button>
+    <button class="preset-btn del" id="contact-del">削除</button>
+    <span class="contact-hint">A社向け文面に「【○○さま】の…」が挿入されます</span>
   </div>
 
   <!-- ══ STEP 1：A社へ（日程のみ）══ -->
@@ -530,6 +547,7 @@
     let viewYear = today.getFullYear(), viewMonth = today.getMonth();
     let selected = {}; // { dateKey: [ {start,end}, ... ] }  STEP1は空配列、STEP2で時間を追加
     let contents = {}; // { dateKey: "内容" } — 各候補日の内容（任意）
+    let contactName = ''; // 確認者の名前（任意）
     let finalSlot = null; // { date, start, end } — STEP 3 で確定した日時
 
     function dateKey(y,m,d){ return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
@@ -726,6 +744,11 @@
           lines.push(`${n}  ${fmtDate(k)}`); i++;
         }
       });
+      // 確認者の文
+      if(contactName && contactName.trim()){
+        lines.push('');
+        lines.push(`【 ${contactName.trim()}さま】のスケジュールをご確認いただけますでしょうか。`);
+      }
       // 内容文（候補日に「内容」が入力されていれば自動挿入）
       const withC = keys.filter(k => contents[k] && contents[k].trim());
       if(withC.length){
@@ -939,6 +962,7 @@
         subject: gv('s-subject'),
         selected,
         contents,
+        contactName,
         finalSlot,
         step,
         duration: gv('s-duration'),
@@ -958,7 +982,9 @@
       activeHistoryId = id; setActive(id);
       selected = h.selected || {};
       contents = h.contents || {};
+      contactName = h.contactName || '';
       finalSlot = h.finalSlot || null;
+      refreshContactList();
       setv('s-subject', h.subject ?? 'MA');
       setv('s-duration', h.duration ?? '60');
       viewYear  = h.vY ?? today.getFullYear();
@@ -1035,6 +1061,63 @@
       const el = document.getElementById('hist-count');
       el.textContent = n;
       el.classList.toggle('hidden', n===0);
+    }
+
+    // ── 確認者プリセット ─────────────────────────────
+    function getContactPresets(){ try { return JSON.parse(localStorage.getItem('contact_presets'))||[]; } catch(e){ return []; } }
+    function setContactPresets(arr){ try { localStorage.setItem('contact_presets', JSON.stringify(arr)); } catch(e){} }
+    function refreshContactList(){
+      const sel = document.getElementById('contact-sel');
+      sel.innerHTML = '<option value="">― なし ―</option>';
+      getContactPresets().forEach(name => {
+        const o = document.createElement('option'); o.value = name; o.textContent = name; sel.appendChild(o);
+      });
+      sel.value = (contactName && getContactPresets().includes(contactName)) ? contactName : '';
+      updateContactBtnState();
+    }
+    function updateContactBtnState(){
+      const sel = document.getElementById('contact-sel');
+      const has = sel.value !== '';
+      document.getElementById('contact-rename').disabled = !has;
+      document.getElementById('contact-del').disabled = !has;
+    }
+    function setupContact(){
+      refreshContactList();
+      document.getElementById('contact-sel').addEventListener('change', e => {
+        contactName = e.target.value;
+        updateContactBtnState();
+        regenerateA();
+      });
+      document.getElementById('contact-add').addEventListener('click', () => {
+        const name = (prompt('確認者名を入力してください（敬称なし。例：山田太郎）')||'').trim();
+        if(!name) return;
+        const arr = getContactPresets();
+        if(arr.includes(name)){ alert('同じ名前が既に保存されています'); contactName = name; refreshContactList(); regenerateA(); return; }
+        arr.push(name); setContactPresets(arr);
+        contactName = name; refreshContactList(); regenerateA();
+      });
+      document.getElementById('contact-rename').addEventListener('click', () => {
+        const cur = document.getElementById('contact-sel').value;
+        if(!cur){ alert('改名する確認者を選択してください'); return; }
+        const newName = (prompt('新しい名前を入力してください', cur)||'').trim();
+        if(!newName || newName === cur) return;
+        const arr = getContactPresets();
+        if(arr.includes(newName)){ alert('同じ名前が既に保存されています'); return; }
+        const idx = arr.indexOf(cur);
+        if(idx>=0) arr[idx] = newName;
+        setContactPresets(arr);
+        if(contactName === cur) contactName = newName;
+        refreshContactList(); regenerateA();
+      });
+      document.getElementById('contact-del').addEventListener('click', () => {
+        const cur = document.getElementById('contact-sel').value;
+        if(!cur){ alert('削除する確認者を選択してください'); return; }
+        if(!confirm(`「${cur}」を削除しますか？`)) return;
+        const arr = getContactPresets().filter(n => n !== cur);
+        setContactPresets(arr);
+        if(contactName === cur) contactName = '';
+        refreshContactList(); regenerateA();
+      });
     }
 
     // ── Template current (always persisted) ──────────
@@ -1186,7 +1269,9 @@
       activeHistoryId = null; setActive(null);
       selected = {};
       contents = {};
+      contactName = '';
       finalSlot = null;
+      refreshContactList();
       setv('s-subject','MA');
       viewYear = today.getFullYear(); viewMonth = today.getMonth();
       setStepView(1);
@@ -1234,6 +1319,7 @@
     setupPresets('a','t-header-a','t-footer-a',regenerateA);
     setupPresets('b','t-header-b','t-footer-b',regenerateB);
     setupPresets('c','t-header-c','t-footer-c',regenerateC);
+    setupContact();
 
     // ── Startup ──────────────────────────────────────
     loadTmplCurrent();
