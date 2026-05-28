@@ -227,6 +227,12 @@
     .final-info { flex: 1; }
     .final-date { font-size: .9rem; font-weight: 700; }
     .final-time { font-size: .76rem; color: var(--text2); margin-top: 3px; }
+    .final-section { margin-bottom: 18px; }
+    .final-section:last-child { margin-bottom: 0; }
+    .final-section-label { font-size: .68rem; color: var(--text3); letter-spacing: .08em; font-weight: 700; margin-bottom: 8px; text-transform: uppercase; }
+    .final-time-row { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: var(--surface2); border: 1px solid var(--accent); border-radius: 9px; flex-wrap: wrap; }
+    .final-time-row .ts-btn { font-size: .95rem; padding: 7px 12px; min-width: 75px; }
+    .dur-note { font-size: .68rem; color: var(--text3); margin-left: auto; }
   </style>
 </head>
 <body class="notranslate">
@@ -452,6 +458,37 @@
             <div class="field">
               <label>結び文</label>
               <textarea id="t-footer-c" rows="2">当日はどうぞよろしくお願いいたします。</textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="output-header">
+            <div class="card-title" style="margin-bottom:0">B社向け確定文面</div>
+            <button class="copy-btn" id="copy-btn-d">コピー</button>
+          </div>
+          <textarea class="output-textarea" id="output-d" placeholder="決定した日時を選択してください"></textarea>
+          <button class="tmpl-toggle" id="tmpl-toggle-d">
+            <span class="arrow">▶</span>テンプレートを編集
+          </button>
+          <div class="tmpl-panel" id="tmpl-panel-d">
+            <div class="tmpl-preset-row">
+              <select class="preset-sel" id="preset-sel-d"><option value="">― 保存済みテンプレート ―</option></select>
+              <button class="preset-btn add" id="preset-add-d">+ 新規追加</button>
+              <button class="preset-btn" id="preset-save-d">上書き</button>
+              <button class="preset-btn" id="preset-rename-d" title="名前を変更">改名</button>
+              <button class="preset-btn icon star" id="preset-default-d" title="デフォルトに設定">☆</button>
+              <button class="preset-btn del" id="preset-del-d">削除</button>
+            </div>
+            <div class="field">
+              <label>冒頭文</label>
+              <div class="tmpl-hint">{subject} で件名を展開</div>
+              <textarea id="t-header-d" rows="4">お世話になっております。
+{subject}の日程につきまして、下記の通り決定いたしましたのでご連絡いたします。</textarea>
+            </div>
+            <div class="field">
+              <label>結び文</label>
+              <textarea id="t-footer-d" rows="2">当日はどうぞよろしくお願いいたします。</textarea>
             </div>
           </div>
         </div>
@@ -934,9 +971,8 @@
       setStepView(1); renderCalendar(); renderDateList(); regenerateA(); saveSession();
     }
     function enterStep3(){
-      const hasSlots = Object.keys(selected).some(k=>selected[k].length>0);
-      if(!hasSlots){ alert('決定する日時がありません。\nSTEP 2 で各日に時間を入力してください。'); return; }
-      setStepView(3); validateFinalSlot(); renderFinalPicker(); regenerateC(); saveSession();
+      if(!Object.keys(selected).length){ alert('候補日が設定されていません'); return; }
+      setStepView(3); validateFinalSlot(); renderFinalPicker(); regenerateC(); regenerateD(); saveSession();
     }
     function exitStep3(){
       setStepView(2); renderTimeEditor(); regenerateB(); saveSession();
@@ -944,41 +980,103 @@
 
     function validateFinalSlot(){
       if(!finalSlot) return;
-      const arr = selected[finalSlot.date];
-      if(!arr || !arr.some(s=>s.start===finalSlot.start)) finalSlot = null;
+      if(!selected[finalSlot.date]) finalSlot = null;
     }
 
     function renderFinalPicker(){
       const c=document.getElementById('final-picker');
-      const keys=Object.keys(selected).sort();
-      let count=0; keys.forEach(k=>count+=selected[k].length);
-      if(!count){ c.innerHTML='<div class="slots-empty"><span>📅</span>確定する日時がありません</div>'; return; }
       c.innerHTML='';
-      keys.forEach(k=>{
-        selected[k].forEach(slot=>{
-          const isF = finalSlot && finalSlot.date===k && finalSlot.start===slot.start;
-          const item=document.createElement('div'); item.className='final-item'+(isF?' selected':'');
-          const radio=document.createElement('div'); radio.className='final-radio';
-          const info=document.createElement('div'); info.className='final-info';
-          const dd=document.createElement('div'); dd.className='final-date'; dd.textContent=fmtDate(k);
-          const dt=document.createElement('div'); dt.className='final-time'; dt.textContent=slot.start+(slot.end?' 〜 '+slot.end:'');
-          info.append(dd,dt); item.append(radio,info);
-          item.addEventListener('click',()=>{
-            finalSlot = { date:k, start:slot.start, end:slot.end };
-            renderFinalPicker(); regenerateC();
-          });
-          c.appendChild(item);
+      const allDates = Object.keys(selected).sort();
+      if(!allDates.length){
+        c.innerHTML='<div class="slots-empty"><span>📅</span>確定する日付がありません</div>';
+        return;
+      }
+
+      // 日付セクション
+      const dateSection = document.createElement('div'); dateSection.className='final-section';
+      const dateLabel = document.createElement('div'); dateLabel.className='final-section-label'; dateLabel.textContent='日付';
+      dateSection.appendChild(dateLabel);
+
+      allDates.forEach(k=>{
+        const isSel = finalSlot && finalSlot.date===k;
+        const item=document.createElement('div'); item.className='final-item'+(isSel?' selected':'');
+        const radio=document.createElement('div'); radio.className='final-radio';
+        const info=document.createElement('div'); info.className='final-info';
+        const dd=document.createElement('div'); dd.className='final-date'; dd.textContent=fmtDate(k);
+        const ws=document.createElement('div'); ws.className='final-time';
+        const slots = selected[k].filter(s=>s.start);
+        if(slots.length){
+          const windows = slots.map(s => s.end ? `${s.start} 〜 ${s.end}` : s.start).join('、');
+          ws.textContent = `A社空き: ${windows}`;
+        } else {
+          ws.textContent = 'A社空き: 指定なし';
+        }
+        info.append(dd,ws); item.append(radio,info);
+        item.addEventListener('click',()=>{
+          const firstSlot = selected[k].find(s=>s.start);
+          const startTime = firstSlot ? firstSlot.start : '10:00';
+          const dur = getDur();
+          const endTime = dur>0 ? addMin(startTime,dur) : (firstSlot && firstSlot.end ? firstSlot.end : '');
+          finalSlot = { date:k, start:startTime, end:endTime };
+          renderFinalPicker(); regenerateC(); regenerateD();
         });
+        dateSection.appendChild(item);
       });
+      c.appendChild(dateSection);
+
+      // 時間セクション（日付選択済の場合）
+      if(finalSlot && finalSlot.date && selected[finalSlot.date]){
+        const timeSection = document.createElement('div'); timeSection.className='final-section';
+        const timeLabel = document.createElement('div'); timeLabel.className='final-section-label'; timeLabel.textContent='時間（確定）';
+        timeSection.appendChild(timeLabel);
+
+        const timeRow = document.createElement('div'); timeRow.className='final-time-row';
+        const sSel = makeTimeSel(finalSlot.start || '10:00');
+        const eSel = makeTimeSel(finalSlot.end || '11:00');
+        sSel.addChangeListener(()=>{
+          finalSlot.start = sSel.getValue();
+          const dur = getDur();
+          if(dur>0){
+            finalSlot.end = addMin(finalSlot.start, dur);
+            eSel.setValue(finalSlot.end);
+          }
+          regenerateC(); regenerateD();
+        });
+        eSel.addChangeListener(()=>{
+          finalSlot.end = eSel.getValue();
+          regenerateC(); regenerateD();
+        });
+        const sep=document.createElement('span'); sep.className='slot-sep'; sep.textContent='〜';
+        timeRow.append(sSel, sep, eSel);
+        const dur = getDur();
+        if(dur>0){
+          const note = document.createElement('span'); note.className='dur-note'; note.textContent=`所要時間: ${fmtDur(dur)}`;
+          timeRow.appendChild(note);
+        }
+        timeSection.appendChild(timeRow);
+        c.appendChild(timeSection);
+      }
     }
 
-    // ── Generate C（確定文面）─────────────────────────
+    // ── Generate C（A社向け確定文面）────────────────
     function regenerateC(){
       saveSession();
       const subj=document.getElementById('s-subject').value.trim()||'打ち合わせ';
       const hdr=document.getElementById('t-header-c').value, ftr=document.getElementById('t-footer-c').value;
       const out=document.getElementById('output-c');
-      if(!finalSlot){ out.value=''; return; }
+      if(!finalSlot || !finalSlot.start){ out.value=''; return; }
+      const dtStr = `${fmtDate(finalSlot.date)}  ${finalSlot.start}${finalSlot.end?' 〜 '+finalSlot.end:''}`;
+      const headerOut = hdr.replace(/\{subject\}/g,subj);
+      out.value = `${headerOut}\n\n${dtStr}\n\n${ftr}`;
+    }
+
+    // ── Generate D（B社向け確定文面）────────────────
+    function regenerateD(){
+      saveSession();
+      const subj=document.getElementById('s-subject').value.trim()||'打ち合わせ';
+      const hdr=document.getElementById('t-header-d').value, ftr=document.getElementById('t-footer-d').value;
+      const out=document.getElementById('output-d');
+      if(!finalSlot || !finalSlot.start){ out.value=''; return; }
       const dtStr = `${fmtDate(finalSlot.date)}  ${finalSlot.start}${finalSlot.end?' 〜 '+finalSlot.end:''}`;
       const headerOut = hdr.replace(/\{subject\}/g,subj);
       out.value = `${headerOut}\n\n${dtStr}\n\n${ftr}`;
@@ -994,7 +1092,7 @@
         });
       });
     }
-    setupCopy('copy-btn-a','output-a'); setupCopy('copy-btn-b','output-b'); setupCopy('copy-btn-c','output-c');
+    setupCopy('copy-btn-a','output-a'); setupCopy('copy-btn-b','output-b'); setupCopy('copy-btn-c','output-c'); setupCopy('copy-btn-d','output-d');
 
     // ── Template toggles ─────────────────────────────
     function setupToggle(tid,pid){
@@ -1003,7 +1101,7 @@
         document.getElementById(tid).classList.toggle('open',o);
       });
     }
-    setupToggle('tmpl-toggle-a','tmpl-panel-a'); setupToggle('tmpl-toggle-b','tmpl-panel-b'); setupToggle('tmpl-toggle-c','tmpl-panel-c');
+    setupToggle('tmpl-toggle-a','tmpl-panel-a'); setupToggle('tmpl-toggle-b','tmpl-panel-b'); setupToggle('tmpl-toggle-c','tmpl-panel-c'); setupToggle('tmpl-toggle-d','tmpl-panel-d');
 
     // ── Persistence helpers ──────────────────────────
     const gv  = id => document.getElementById(id).value;
@@ -1069,9 +1167,10 @@
       viewMonth = h.vM ?? today.getMonth();
       document.getElementById('output-b').value = '';
       document.getElementById('output-c').value = '';
+      document.getElementById('output-d').value = '';
       setStepView(1);
       renderCalendar(); renderDateList(); regenerateA();
-      if(h.step===3){ setStepView(3); renderTimeEditor(); regenerateB(); validateFinalSlot(); renderFinalPicker(); regenerateC(); }
+      if(h.step===3){ setStepView(3); renderTimeEditor(); regenerateB(); validateFinalSlot(); renderFinalPicker(); regenerateC(); regenerateD(); }
       else if(h.step===2){ setStepView(2); renderTimeEditor(); regenerateB(); }
       updateHistCount();
       return true;
@@ -1229,17 +1328,20 @@
     // ── Template current (always persisted) ──────────
     function saveTmplCurrent(){
       try {
-        const aArr=getPresets('a'), bArr=getPresets('b'), cArr=getPresets('c');
+        const aArr=getPresets('a'), bArr=getPresets('b'), cArr=getPresets('c'), dArr=getPresets('d');
         const selAVal=document.getElementById('preset-sel-a').value;
         const selBVal=document.getElementById('preset-sel-b').value;
         const selCVal=document.getElementById('preset-sel-c').value;
+        const selDVal=document.getElementById('preset-sel-d').value;
         localStorage.setItem('tmpl_current', JSON.stringify({
           ha: gv('t-header-a'), fa: gv('t-footer-a'),
           hb: gv('t-header-b'), fb: gv('t-footer-b'),
           hc: gv('t-header-c'), fc: gv('t-footer-c'),
+          hd: gv('t-header-d'), fd: gv('t-footer-d'),
           selA: (selAVal!=='' && aArr[selAVal]) ? aArr[selAVal].name : null,
           selB: (selBVal!=='' && bArr[selBVal]) ? bArr[selBVal].name : null,
           selC: (selCVal!=='' && cArr[selCVal]) ? cArr[selCVal].name : null,
+          selD: (selDVal!=='' && dArr[selDVal]) ? dArr[selDVal].name : null,
         }));
       } catch(e){}
     }
@@ -1252,9 +1354,12 @@
       if(t.fb!=null) setv('t-footer-b',t.fb);
       if(t.hc!=null) setv('t-header-c',t.hc);
       if(t.fc!=null) setv('t-footer-c',t.fc);
+      if(t.hd!=null) setv('t-header-d',t.hd);
+      if(t.fd!=null) setv('t-footer-d',t.fd);
       if(t.selA){ const i=getPresets('a').findIndex(p=>p.name===t.selA); if(i>=0) document.getElementById('preset-sel-a').value=i; }
       if(t.selB){ const i=getPresets('b').findIndex(p=>p.name===t.selB); if(i>=0) document.getElementById('preset-sel-b').value=i; }
       if(t.selC){ const i=getPresets('c').findIndex(p=>p.name===t.selC); if(i>=0) document.getElementById('preset-sel-c').value=i; }
+      if(t.selD){ const i=getPresets('d').findIndex(p=>p.name===t.selD); if(i>=0) document.getElementById('preset-sel-d').value=i; }
     }
 
     // ── Template presets (named) ─────────────────────
@@ -1384,6 +1489,7 @@
       document.getElementById('restore-banner').style.display='none';
       document.getElementById('output-b').value='';
       document.getElementById('output-c').value='';
+      document.getElementById('output-d').value='';
       renderCalendar(); renderDateList(); regenerateA();
     }
     // 履歴ごと削除して初期化
@@ -1413,24 +1519,34 @@
     document.getElementById('banner-close').addEventListener('click', ()=>{ document.getElementById('restore-banner').style.display='none'; });
     document.getElementById('prev-month').addEventListener('click',()=>{ if(--viewMonth<0){viewMonth=11;viewYear--;} renderCalendar(); saveSession(); });
     document.getElementById('next-month').addEventListener('click',()=>{ if(++viewMonth>11){viewMonth=0;viewYear++;} renderCalendar(); saveSession(); });
-    document.getElementById('s-subject').addEventListener('input',()=>{ regenerateA(); regenerateB(); regenerateC(); });
-    document.getElementById('s-duration').addEventListener('change', saveSession);
+    document.getElementById('s-subject').addEventListener('input',()=>{ regenerateA(); regenerateB(); regenerateC(); regenerateD(); });
+    document.getElementById('s-duration').addEventListener('change', ()=>{
+      saveSession();
+      // STEP 3 で時間ピッカーが開いている場合は終了時刻を再計算
+      if(finalSlot && finalSlot.start && document.getElementById('step3').style.display==='block'){
+        const dur=getDur();
+        if(dur>0){ finalSlot.end = addMin(finalSlot.start, dur); renderFinalPicker(); regenerateC(); regenerateD(); }
+      }
+    });
     document.getElementById('t-header-a').addEventListener('input',()=>{ regenerateA(); saveTmplCurrent(); });
     document.getElementById('t-footer-a').addEventListener('input',()=>{ regenerateA(); saveTmplCurrent(); });
     document.getElementById('t-header-b').addEventListener('input',()=>{ regenerateB(); saveTmplCurrent(); });
     document.getElementById('t-footer-b').addEventListener('input',()=>{ regenerateB(); saveTmplCurrent(); });
     document.getElementById('t-header-c').addEventListener('input',()=>{ regenerateC(); saveTmplCurrent(); });
     document.getElementById('t-footer-c').addEventListener('input',()=>{ regenerateC(); saveTmplCurrent(); });
+    document.getElementById('t-header-d').addEventListener('input',()=>{ regenerateD(); saveTmplCurrent(); });
+    document.getElementById('t-footer-d').addEventListener('input',()=>{ regenerateD(); saveTmplCurrent(); });
 
     setupPresets('a','t-header-a','t-footer-a',regenerateA);
     setupPresets('b','t-header-b','t-footer-b',regenerateB);
     setupPresets('c','t-header-c','t-footer-c',regenerateC);
+    setupPresets('d','t-header-d','t-footer-d',regenerateD);
     setupContact();
 
     // ── Startup ──────────────────────────────────────
     loadTmplCurrent();
     // デフォルトテンプレートを適用（選択が空なら）
-    ['a','b','c'].forEach(w=>{
+    ['a','b','c','d'].forEach(w=>{
       const sel=document.getElementById('preset-sel-'+w);
       if(sel.value===''){
         const def=getDefault(w);
