@@ -752,16 +752,23 @@
       // 内容文（候補日に「内容」が入力されていれば自動挿入）
       const withC = keys.filter(k => contents[k] && contents[k].trim());
       if(withC.length){
-        const parts = withC.map(k => {
-          const [y,m,d] = k.split('-').map(Number);
-          return `${m}月${d}日が「${contents[k].trim()}」`;
-        });
-        const last = parts[parts.length-1];
-        const head = parts.slice(0,-1);
-        const sentence = head.length
-          ? `内容は${head.join('で、')}で、${last}です。`
-          : `内容は${last}です。`;
-        lines.push('', sentence);
+        const allSame = withC.every(k => contents[k].trim() === contents[withC[0]].trim());
+        const allFilled = withC.length === keys.length;
+        if(allSame && allFilled){
+          // すべて同じ内容 → まとめて表示
+          lines.push('', `内容は「${contents[withC[0]].trim()}」です。`);
+        } else {
+          const parts = withC.map(k => {
+            const [y,m,d] = k.split('-').map(Number);
+            return `${m}月${d}日が「${contents[k].trim()}」`;
+          });
+          const last = parts[parts.length-1];
+          const head = parts.slice(0,-1);
+          const sentence = head.length
+            ? `内容は${head.join('で、')}で、${last}です。`
+            : `内容は${last}です。`;
+          lines.push('', sentence);
+        }
       }
       lines.push('',ftr); out.value=lines.join('\n');
     }
