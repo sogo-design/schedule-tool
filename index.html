@@ -297,6 +297,7 @@
     </select>
     <button class="preset-btn add" id="contact-add">+ 追加</button>
     <button class="preset-btn" id="contact-rename">改名</button>
+    <button class="preset-btn icon star" id="contact-default" title="デフォルトに設定">☆</button>
     <button class="preset-btn del" id="contact-del">削除</button>
     <span class="contact-hint">A社向け文面に「【○○さま】の…」が挿入されます</span>
   </div>
@@ -753,9 +754,8 @@
       const withC = keys.filter(k => contents[k] && contents[k].trim());
       if(withC.length){
         const allSame = withC.every(k => contents[k].trim() === contents[withC[0]].trim());
-        const allFilled = withC.length === keys.length;
-        if(allSame && allFilled){
-          // すべて同じ内容 → まとめて表示
+        if(allSame){
+          // 入力されているものがすべて同じ内容（または1件のみ） → まとめて表示
           lines.push('', `内容は「${contents[withC[0]].trim()}」です。`);
         } else {
           const parts = withC.map(k => {
@@ -1073,14 +1073,21 @@
     // ── 確認者プリセット ─────────────────────────────
     function getContactPresets(){ try { return JSON.parse(localStorage.getItem('contact_presets'))||[]; } catch(e){ return []; } }
     function setContactPresets(arr){ try { localStorage.setItem('contact_presets', JSON.stringify(arr)); } catch(e){} }
+    function getContactDefault(){ return localStorage.getItem('contact_default') || ''; }
+    function setContactDefault(name){ if(name) localStorage.setItem('contact_default', name); else localStorage.removeItem('contact_default'); }
+
     function refreshContactList(){
       const sel = document.getElementById('contact-sel');
+      const def = getContactDefault();
       sel.innerHTML = '<option value="">― なし ―</option>';
       getContactPresets().forEach(name => {
-        const o = document.createElement('option'); o.value = name; o.textContent = name; sel.appendChild(o);
+        const o = document.createElement('option');
+        o.value = name; o.textContent = (name === def ? '★ ' : '') + name;
+        sel.appendChild(o);
       });
       sel.value = (contactName && getContactPresets().includes(contactName)) ? contactName : '';
       updateContactBtnState();
+      updateContactDefaultBtn();
     }
     function updateContactBtnState(){
       const sel = document.getElementById('contact-sel');
@@ -1088,11 +1095,23 @@
       document.getElementById('contact-rename').disabled = !has;
       document.getElementById('contact-del').disabled = !has;
     }
+    function updateContactDefaultBtn(){
+      const sel = document.getElementById('contact-sel');
+      const btn = document.getElementById('contact-default');
+      const cur = sel.value;
+      if(!cur){ btn.disabled = true; btn.textContent = '☆'; btn.classList.remove('on'); btn.title = 'デフォルトに設定'; return; }
+      btn.disabled = false;
+      const isDef = cur === getContactDefault();
+      btn.textContent = isDef ? '★' : '☆';
+      btn.classList.toggle('on', isDef);
+      btn.title = isDef ? 'デフォルトを解除' : 'デフォルトに設定';
+    }
+
     function setupContact(){
       refreshContactList();
       document.getElementById('contact-sel').addEventListener('change', e => {
         contactName = e.target.value;
-        updateContactBtnState();
+        updateContactBtnState(); updateContactDefaultBtn();
         regenerateA();
       });
       document.getElementById('contact-add').addEventListener('click', () => {
@@ -1114,7 +1133,15 @@
         if(idx>=0) arr[idx] = newName;
         setContactPresets(arr);
         if(contactName === cur) contactName = newName;
+        if(getContactDefault() === cur) setContactDefault(newName);
         refreshContactList(); regenerateA();
+      });
+      document.getElementById('contact-default').addEventListener('click', () => {
+        const cur = document.getElementById('contact-sel').value;
+        if(!cur) return;
+        if(getContactDefault() === cur) setContactDefault(null);
+        else setContactDefault(cur);
+        refreshContactList();
       });
       document.getElementById('contact-del').addEventListener('click', () => {
         const cur = document.getElementById('contact-sel').value;
@@ -1123,6 +1150,7 @@
         const arr = getContactPresets().filter(n => n !== cur);
         setContactPresets(arr);
         if(contactName === cur) contactName = '';
+        if(getContactDefault() === cur) setContactDefault(null);
         refreshContactList(); regenerateA();
       });
     }
@@ -1346,6 +1374,14 @@
       }
       updateSaveBtnState(w);
     });
+    // 確認者のデフォルト適用（未選択ならデフォルトを使う）
+    if(!contactName){
+      const cDef = getContactDefault();
+      if(cDef && getContactPresets().includes(cDef)){
+        contactName = cDef;
+        refreshContactList();
+      }
+    }
     saveTmplCurrent();
     // 旧バージョンからの移行（schedule_session → 履歴1件）
     try {
