@@ -102,6 +102,10 @@
     .add-time-btn { background: none; border: 1px solid var(--border2); color: var(--text2); border-radius: 5px; font-size: .7rem; padding: 4px 11px; cursor: pointer; font-family: inherit; transition: all .12s; white-space: nowrap; }
     .add-time-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
     .date-row-actions { display: flex; gap: 6px; align-items: center; }
+    .date-row-left { display: flex; gap: 8px; align-items: center; flex: 1; min-width: 0; }
+    .date-content-input { background: var(--surface); border: 1px solid var(--border); border-radius: 5px; color: var(--text); font-size: .76rem; padding: 4px 9px; font-family: inherit; outline: none; flex: 1; min-width: 60px; max-width: 200px; transition: border-color .12s; height: 28px; }
+    .date-content-input:focus { border-color: var(--accent); }
+    .date-content-input::placeholder { color: var(--text3); }
     .empty-time-note { font-size: .68rem; color: var(--text3); margin-bottom: 8px; }
 
     /* ── TimeSel ── */
@@ -525,6 +529,7 @@
     const today = new Date(); today.setHours(0,0,0,0);
     let viewYear = today.getFullYear(), viewMonth = today.getMonth();
     let selected = {}; // { dateKey: [ {start,end}, ... ] }  STEP1は空配列、STEP2で時間を追加
+    let contents = {}; // { dateKey: "内容" } — 各候補日の内容（任意）
     let finalSlot = null; // { date, start, end } — STEP 3 で確定した日時
 
     function dateKey(y,m,d){ return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
@@ -617,7 +622,7 @@
         grid.appendChild(el);
       }
     }
-    function toggleDate(k){ if(selected[k])delete selected[k]; else selected[k]=[]; renderCalendar();renderDateList();regenerateA(); }
+    function toggleDate(k){ if(selected[k]){delete selected[k]; delete contents[k];} else selected[k]=[]; renderCalendar();renderDateList();regenerateA(); }
 
     // ── STEP 1: 候補日リスト（日付＋オプションで時間）─
     function renderDateList(){
@@ -633,8 +638,13 @@
 
     function makeSimpleRowA(k){
       const row=document.createElement('div'); row.className='date-row';
+      const left=document.createElement('div'); left.className='date-row-left';
       const lbl=document.createElement('span'); lbl.className='date-label'; lbl.textContent=fmtDate(k);
       if(HOLIDAYS[k]){ const hn=document.createElement('span'); hn.className='holiday-name'; hn.textContent=HOLIDAYS[k]; lbl.appendChild(hn); }
+      const cIn=document.createElement('input'); cIn.type='text'; cIn.className='date-content-input'; cIn.placeholder='内容（任意）';
+      cIn.value = contents[k] || '';
+      cIn.addEventListener('input',()=>{ contents[k]=cIn.value; regenerateA(); });
+      left.append(lbl, cIn);
       const actions=document.createElement('div'); actions.className='date-row-actions';
       const addTime=document.createElement('button'); addTime.className='add-time-btn'; addTime.textContent='+ 時間も追加';
       addTime.title='この日に時間帯を指定する';
@@ -644,21 +654,26 @@
         renderDateList(); regenerateA();
       });
       const rm=document.createElement('button'); rm.className='remove-date'; rm.textContent='×';
-      rm.addEventListener('click',()=>{ delete selected[k]; renderCalendar();renderDateList();regenerateA(); });
+      rm.addEventListener('click',()=>{ delete selected[k]; delete contents[k]; renderCalendar();renderDateList();regenerateA(); });
       actions.append(addTime, rm);
-      row.append(lbl, actions);
+      row.append(left, actions);
       return row;
     }
 
     function makeDateItemA(k){
       const item=document.createElement('div'); item.className='date-item';
       const hdr=document.createElement('div'); hdr.className='date-item-header';
+      const left=document.createElement('div'); left.className='date-row-left';
       const lbl=document.createElement('span'); lbl.className='date-label'; lbl.textContent=fmtDate(k);
       if(HOLIDAYS[k]){ const hn=document.createElement('span'); hn.className='holiday-name'; hn.textContent=HOLIDAYS[k]; lbl.appendChild(hn); }
+      const cIn=document.createElement('input'); cIn.type='text'; cIn.className='date-content-input'; cIn.placeholder='内容（任意）';
+      cIn.value = contents[k] || '';
+      cIn.addEventListener('input',()=>{ contents[k]=cIn.value; regenerateA(); });
+      left.append(lbl, cIn);
       const rm=document.createElement('button'); rm.className='remove-date'; rm.textContent='×';
       rm.title='この日を候補から削除';
-      rm.addEventListener('click',()=>{ delete selected[k]; renderCalendar();renderDateList();regenerateA(); });
-      hdr.append(lbl, rm); item.appendChild(hdr);
+      rm.addEventListener('click',()=>{ delete selected[k]; delete contents[k]; renderCalendar();renderDateList();regenerateA(); });
+      hdr.append(left, rm); item.appendChild(hdr);
 
       const sl=document.createElement('div'); sl.className='slot-list';
       selected[k].forEach((slot,idx)=>sl.appendChild(makeSlotRowA(k,idx,slot)));
@@ -711,6 +726,20 @@
           lines.push(`${n}  ${fmtDate(k)}`); i++;
         }
       });
+      // 内容文（候補日に「内容」が入力されていれば自動挿入）
+      const withC = keys.filter(k => contents[k] && contents[k].trim());
+      if(withC.length){
+        const parts = withC.map(k => {
+          const [y,m,d] = k.split('-').map(Number);
+          return `${m}月${d}日が「${contents[k].trim()}」`;
+        });
+        const last = parts[parts.length-1];
+        const head = parts.slice(0,-1);
+        const sentence = head.length
+          ? `内容は${head.join('で、')}で、${last}です。`
+          : `内容は${last}です。`;
+        lines.push('', sentence);
+      }
       lines.push('',ftr); out.value=lines.join('\n');
     }
 
@@ -909,6 +938,7 @@
         id: activeHistoryId,
         subject: gv('s-subject'),
         selected,
+        contents,
         finalSlot,
         step,
         duration: gv('s-duration'),
@@ -927,6 +957,7 @@
       if(!h) return false;
       activeHistoryId = id; setActive(id);
       selected = h.selected || {};
+      contents = h.contents || {};
       finalSlot = h.finalSlot || null;
       setv('s-subject', h.subject ?? 'MA');
       setv('s-duration', h.duration ?? '60');
@@ -1154,6 +1185,7 @@
     function resetState(){
       activeHistoryId = null; setActive(null);
       selected = {};
+      contents = {};
       finalSlot = null;
       setv('s-subject','MA');
       viewYear = today.getFullYear(); viewMonth = today.getMonth();
