@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>日程調整ツール</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0d0f18; --surface: #161926; --surface2: #1e2235; --surface3: #252a40;
+      --border: #2a2f48; --border2: #333856;
+      --accent: #5b78f0; --accent-glow: rgba(91,120,240,0.15);
+      --text: #dde1f5; --text2: #9298b8; --text3: #5a6080;
+      --danger: #e05c6a; --holiday: #d46070; --green: #3ecf80;
+      --radius: 12px; --radius-sm: 7px;
+    }
+    body { font-family: "Hiragino Kaku Gothic ProN","Hiragino Sans",Meiryo,sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 32px 20px 60px; }
+
+    /* ── Page header ── */
+    .page-header { max-width: 840px; margin: 0 auto 20px; }
+    .page-header h1 { font-size: 1rem; font-weight: 600; color: var(--text2); letter-spacing: .06em; margin-bottom: 16px; }
+
+    /* ── Step bar ── */
+    .step-bar { display: flex; align-items: center; }
+    .step-item { display: flex; align-items: center; gap: 9px; padding: 9px 18px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface); transition: all .2s; }
+    .step-item.active { border-color: var(--accent); background: var(--accent-glow); }
+    .step-item.done { border-color: var(--green); background: rgba(62,207,128,.07); }
+    .step-num { width: 20px; height: 20px; border-radius: 50%; background: var(--border); color: var(--text3); font-size: .68rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all .2s; }
+    .step-item.active .step-num { background: var(--accent); color: #fff; }
+    .step-item.done .step-num { background: var(--green); color: #fff; }
+    .step-lbl { font-size: .8rem; font-weight: 700; color: var(--text3); white-space: nowrap; }
+    .step-sub { font-size: .63rem; color: var(--text3); margin-top: 1px; }
+    .step-item.active .step-lbl { color: var(--accent); }
+    .step-item.done .step-lbl { color: var(--green); }
+    .step-connector { height: 1px; width: 44px; background: var(--border); flex-shrink: 0; transition: background .3s; }
+    .step-connector.done { background: var(--green); }
+
+    /* ── Settings ── */
+    .settings { max-width: 840px; margin: 0 auto 16px; display: flex; gap: 10px; align-items: flex-end; }
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field label { font-size: .68rem; color: var(--text3); letter-spacing: .08em; font-weight: 600; }
+    .field input, .field select { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: .875rem; padding: 8px 11px; font-family: inherit; outline: none; height: 36px; transition: border-color .15s; }
+    .field input:focus, .field select:focus { border-color: var(--accent); }
+    .field select { cursor: pointer; }
+    .field-subject { flex: 1; min-width: 180px; }
+    .field-dur-note { font-size: .62rem; color: var(--text3); margin-top: 3px; }
+
+    /* ── Layout ── */
+    .layout { max-width: 840px; margin: 0 auto; display: grid; grid-template-columns: 292px 1fr; gap: 12px; align-items: start; }
+    .layout.s2 { grid-template-columns: 1fr 1fr; }
+    @media (max-width: 660px) { .layout, .layout.s2 { grid-template-columns: 1fr; } }
+    .right-col { display: flex; flex-direction: column; gap: 12px; }
+
+    /* ── Card ── */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }
+    .card-title { font-size: .68rem; font-weight: 700; color: var(--text3); letter-spacing: .1em; text-transform: uppercase; margin-bottom: 14px; }
+
+    /* ── Calendar ── */
+    .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .cal-header .month-label { font-size: .9rem; font-weight: 600; }
+    .nav-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text2); width: 28px; height: 28px; border-radius: var(--radius-sm); cursor: pointer; font-size: .9rem; display: flex; align-items: center; justify-content: center; transition: border-color .12s, color .12s; }
+    .nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; }
+    .cal-dow { text-align: center; font-size: .62rem; color: var(--text3); padding: 5px 0 7px; font-weight: 700; }
+    .cal-dow.sat { color: var(--text2); } .cal-dow.sun { color: var(--holiday); }
+    .cal-day { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 6px; font-size: .78rem; cursor: pointer; transition: background .1s, color .1s; user-select: none; color: var(--text2); }
+    .cal-day.empty { cursor: default; }
+    .cal-day.past { color: var(--text3); cursor: default; }
+    .cal-day.sat { color: var(--text2); } .cal-day.sun { color: var(--holiday); }
+    .cal-day.holiday { color: var(--holiday); }
+    .cal-day.today { background: rgba(91,120,240,.18) !important; color: var(--accent) !important; font-weight: 700; border: 1px solid rgba(91,120,240,.45); }
+    .cal-day.selected { background: var(--accent) !important; color: #fff !important; font-weight: 700; border: none; }
+    .cal-day:not(.empty):not(.past):not(.selected):not(.today):hover { background: var(--surface3); color: var(--text); }
+
+    /* ── Date list (STEP 1) ── */
+    .slots-empty { color: var(--text3); font-size: .8rem; text-align: center; padding: 28px 0; line-height: 1.7; }
+    .slots-empty span { display: block; font-size: 1.4rem; margin-bottom: 6px; opacity: .4; }
+    .date-row { display: flex; align-items: center; justify-content: space-between; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 13px; margin-bottom: 7px; }
+    .date-row:last-child { margin-bottom: 0; }
+
+    /* ── Date item (STEP 2 editor) ── */
+    .date-item { background: var(--surface2); border: 1px solid var(--border); border-radius: 9px; padding: 11px 13px 13px; margin-bottom: 8px; }
+    .date-item:last-child { margin-bottom: 0; }
+    .date-item-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .date-label { font-size: .85rem; font-weight: 700; color: var(--text); }
+    .date-label .holiday-name { font-size: .68rem; font-weight: 400; color: var(--holiday); margin-left: 6px; }
+    .remove-date { background: none; border: none; color: var(--text3); cursor: pointer; font-size: .9rem; padding: 3px 6px; border-radius: 5px; transition: color .1s, background .1s; line-height: 1; }
+    .remove-date:hover { color: var(--danger); background: rgba(224,92,106,.1); }
+    .ng-btn { background: none; border: 1px solid var(--border); color: var(--text3); font-size: .67rem; padding: 3px 10px; border-radius: 5px; cursor: pointer; font-family: inherit; transition: all .1s; }
+    .ng-btn:hover { border-color: var(--danger); color: var(--danger); }
+    .slot-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+    .slot-row { display: flex; align-items: center; gap: 7px; }
+    .slot-sep { color: var(--text3); font-size: .78rem; flex-shrink: 0; }
+    .del-slot { background: none; border: none; color: var(--text3); cursor: pointer; font-size: .82rem; padding: 3px 6px; border-radius: 4px; margin-left: 2px; transition: color .1s; line-height: 1; }
+    .del-slot:hover { color: var(--danger); }
+    .slot-actions { display: flex; flex-wrap: wrap; gap: 5px; }
+    .quick-btn { background: var(--surface3); border: 1px solid var(--border); color: var(--text2); border-radius: 5px; font-size: .7rem; padding: 4px 9px; cursor: pointer; transition: all .1s; font-family: inherit; }
+    .quick-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+    .add-slot-btn { background: none; border: 1px dashed var(--border2); color: var(--text3); border-radius: 5px; font-size: .7rem; padding: 4px 10px; cursor: pointer; transition: all .1s; font-family: inherit; }
+    .add-slot-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .add-time-btn { background: none; border: 1px solid var(--border2); color: var(--text2); border-radius: 5px; font-size: .7rem; padding: 4px 11px; cursor: pointer; font-family: inherit; transition: all .12s; white-space: nowrap; }
+    .add-time-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+    .date-row-actions { display: flex; gap: 6px; align-items: center; }
+    .empty-time-note { font-size: .68rem; color: var(--text3); margin-bottom: 8px; }
+
+    /* ── TimeSel ── */
+    .ts-root { position: relative; display: inline-block; }
+    .ts-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: .84rem; font-family: inherit; padding: 5px 10px; cursor: pointer; min-width: 60px; text-align: center; transition: border-color .12s; line-height: 1.4; display: block; }
+    .ts-btn:hover { border-color: var(--border2); }
+    .ts-btn.active { border-color: var(--accent); color: var(--accent); }
+    .ts-picker { position: absolute; top: calc(100% + 4px); left: 0; display: flex; background: var(--surface); border: 1px solid var(--border2); border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,.5); z-index: 300; overflow: hidden; }
+    .ts-h-list { overflow-y: auto; max-height: 180px; scrollbar-width: thin; scrollbar-color: var(--border2) transparent; min-width: 52px; }
+    .ts-h-list::-webkit-scrollbar { width: 4px; }
+    .ts-h-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+    .ts-m-list { border-left: 1px solid var(--border); min-width: 52px; }
+    .ts-h-opt, .ts-m-opt { display: block; width: 100%; background: none; border: none; color: var(--text2); font-size: .8rem; font-family: inherit; padding: 7px 0; cursor: pointer; text-align: center; transition: background .08s, color .08s; }
+    .ts-h-opt:hover, .ts-m-opt:hover { background: var(--surface2); color: var(--text); }
+    .ts-h-opt.sel, .ts-m-opt.sel { color: var(--accent); font-weight: 700; background: var(--accent-glow); }
+    .ts-edit { display: inline-flex; align-items: center; background: var(--surface); border: 1px solid var(--accent); border-radius: 6px; padding: 0 6px; gap: 1px; }
+    .ts-edit input[type="number"] { background: transparent; border: none; color: var(--text); font-size: .84rem; font-family: inherit; outline: none; text-align: center; padding: 5px 0; width: 26px; -moz-appearance: textfield; }
+    .ts-edit input[type="number"]::-webkit-inner-spin-button, .ts-edit input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+    .ts-ecolon { color: var(--text3); font-size: .84rem; margin: 0 1px; }
+
+    /* ── Output ── */
+    .output-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .copy-btn { background: var(--accent); border: none; color: #fff; font-size: .78rem; font-weight: 700; padding: 6px 16px; border-radius: var(--radius-sm); cursor: pointer; transition: opacity .12s, background .12s; font-family: inherit; }
+    .copy-btn:hover { opacity: .82; }
+    .copy-btn.copied { background: var(--green); }
+    .output-textarea { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 9px; color: var(--text); font-size: .84rem; line-height: 1.85; padding: 14px 16px; font-family: "Hiragino Kaku Gothic ProN","Hiragino Sans",Meiryo,sans-serif; resize: vertical; min-height: 190px; outline: none; transition: border-color .12s; }
+    .output-textarea:focus { border-color: var(--border2); }
+
+    /* ── Template editor ── */
+    .tmpl-toggle { display: inline-flex; align-items: center; gap: 5px; background: none; border: none; color: var(--text3); font-size: .72rem; cursor: pointer; font-family: inherit; padding: 0; margin-top: 10px; transition: color .1s; }
+    .tmpl-toggle:hover { color: var(--text2); }
+    .tmpl-toggle .arrow { font-size: .6rem; transition: transform .15s; display: inline-block; }
+    .tmpl-toggle.open .arrow { transform: rotate(90deg); }
+    .tmpl-panel { margin-top: 12px; display: none; flex-direction: column; gap: 10px; }
+    .tmpl-panel.open { display: flex; }
+    .tmpl-panel textarea { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: .8rem; padding: 9px 11px; font-family: inherit; line-height: 1.7; resize: vertical; outline: none; width: 100%; transition: border-color .12s; }
+    .tmpl-panel textarea:focus { border-color: var(--accent); }
+    .tmpl-hint { color: var(--text3); font-size: .68rem; margin-top: 2px; }
+
+    /* ── Step nav ── */
+    .step-nav { max-width: 840px; margin: 14px auto 0; display: flex; gap: 10px; }
+    .step-nav.right { justify-content: flex-end; }
+    .btn-next { background: var(--accent); border: none; color: #fff; font-size: .875rem; font-weight: 700; padding: 10px 24px; border-radius: var(--radius-sm); cursor: pointer; font-family: inherit; transition: opacity .12s; }
+    .btn-next:hover { opacity: .82; }
+    .btn-back { background: none; border: 1px solid var(--border); color: var(--text2); font-size: .875rem; padding: 10px 20px; border-radius: var(--radius-sm); cursor: pointer; font-family: inherit; transition: all .12s; }
+    .btn-back:hover { border-color: var(--text2); color: var(--text); }
+    .resp-summary { font-size: .72rem; color: var(--text3); margin-top: 10px; text-align: right; }
+    .resp-summary b { color: var(--accent); }
+    .btn-finish { background: var(--green); border: none; color: #08130c; font-size: .875rem; font-weight: 700; padding: 10px 22px; border-radius: var(--radius-sm); cursor: pointer; font-family: inherit; transition: opacity .12s; }
+    .btn-finish:hover { opacity: .85; }
+
+    /* ── Template presets ── */
+    .tmpl-preset-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 4px; }
+    .preset-sel { flex: 1; min-width: 130px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: .75rem; padding: 0 9px; height: 32px; font-family: inherit; outline: none; cursor: pointer; }
+    .preset-sel:focus { border-color: var(--accent); }
+    .preset-btn { background: var(--surface3); border: 1px solid var(--border); color: var(--text2); border-radius: 5px; font-size: .7rem; padding: 6px 11px; cursor: pointer; font-family: inherit; transition: all .1s; white-space: nowrap; }
+    .preset-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .preset-btn.add { border-color: rgba(91,120,240,.45); color: var(--accent); }
+    .preset-btn.add:hover { background: var(--accent-glow); }
+    .preset-btn.del:hover { border-color: var(--danger); color: var(--danger); }
+    .preset-btn.icon { padding: 6px 10px; font-size: .85rem; min-width: 30px; line-height: 1; }
+    .preset-btn.star.on { background: rgba(255,200,80,.15); color: #ffcb5a; border-color: rgba(255,200,80,.5); }
+    .preset-btn.star.on:hover { background: rgba(255,200,80,.22); }
+    .preset-btn:disabled { opacity: .35; cursor: not-allowed; }
+    .preset-btn:disabled:hover { border-color: var(--border); color: var(--text2); background: var(--surface3); }
+
+    /* ── Restore banner ── */
+    .restore-banner { max-width: 840px; margin: 0 auto 14px; background: var(--surface2); border: 1px solid var(--accent); border-radius: var(--radius-sm); padding: 9px 14px; font-size: .78rem; color: var(--text2); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .restore-banner span b { color: var(--accent); }
+    .restore-banner button { background: none; border: 1px solid var(--border2); color: var(--text2); font-size: .72rem; padding: 5px 12px; border-radius: 5px; cursor: pointer; font-family: inherit; transition: all .1s; white-space: nowrap; }
+    .restore-banner button:hover { border-color: var(--text2); color: var(--text); }
+
+    /* ── Header actions / history ── */
+    .header-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+    .header-top h1 { margin-bottom: 0; }
+    .header-actions { display: flex; gap: 8px; }
+    .hist-btn, .new-task-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text2); font-size: .76rem; padding: 6px 14px; border-radius: var(--radius-sm); cursor: pointer; font-family: inherit; transition: all .12s; display: inline-flex; align-items: center; gap: 6px; }
+    .hist-btn:hover, .new-task-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .hist-count { background: var(--accent); color: #fff; font-size: .65rem; font-weight: 700; padding: 1px 7px; border-radius: 10px; min-width: 18px; text-align: center; }
+    .hist-count.hidden { display: none; }
+
+    /* ── History modal ── */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 500; display: none; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .hist-modal-box { background: var(--surface); border: 1px solid var(--border2); border-radius: var(--radius); padding: 22px 22px 20px; max-width: 540px; width: calc(100% - 32px); max-height: 80vh; overflow-y: auto; }
+    .hist-modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .hist-modal-header h2 { font-size: .92rem; font-weight: 700; color: var(--text); }
+    .modal-close { background: none; border: none; color: var(--text3); font-size: 1.1rem; cursor: pointer; padding: 4px 8px; border-radius: 4px; line-height: 1; }
+    .modal-close:hover { color: var(--text); }
+    .hist-item { display: flex; align-items: center; gap: 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 11px 14px; margin-bottom: 7px; cursor: pointer; transition: all .12s; }
+    .hist-item:hover { border-color: var(--border2); }
+    .hist-item.active { border-color: var(--accent); background: var(--accent-glow); }
+    .hist-item.active .hist-title::before { content: '● '; color: var(--accent); }
+    .hist-info { flex: 1; min-width: 0; }
+    .hist-title { font-size: .85rem; font-weight: 700; color: var(--text); }
+    .hist-meta { font-size: .7rem; color: var(--text3); margin-top: 3px; }
+    .hist-step { display: inline-block; background: var(--surface3); color: var(--text2); font-size: .62rem; font-weight: 700; padding: 1px 7px; border-radius: 8px; margin-right: 6px; }
+    .hist-step.s2 { background: rgba(62,207,128,.18); color: var(--green); }
+    .hist-del { background: none; border: none; color: var(--text3); cursor: pointer; font-size: .9rem; padding: 4px 9px; border-radius: 5px; flex-shrink: 0; transition: all .1s; }
+    .hist-del:hover { color: var(--danger); background: rgba(224,92,106,.1); }
+    .hist-empty { color: var(--text3); font-size: .8rem; text-align: center; padding: 32px 0; }
+    .hist-step.s3 { background: rgba(255,200,80,.18); color: #ffcb5a; }
+
+    /* ── Final slot picker (STEP 3) ── */
+    .final-hint { font-size: .72rem; color: var(--text3); margin-bottom: 12px; line-height: 1.6; }
+    .final-item { display: flex; align-items: center; gap: 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 9px; padding: 12px 14px; margin-bottom: 7px; cursor: pointer; transition: all .15s; user-select: none; }
+    .final-item:last-child { margin-bottom: 0; }
+    .final-item:hover { border-color: var(--border2); }
+    .final-item.selected { border-color: var(--accent); background: var(--accent-glow); }
+    .final-radio { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--text3); flex-shrink: 0; transition: all .15s; position: relative; }
+    .final-item.selected .final-radio { border-color: var(--accent); }
+    .final-item.selected .final-radio::after { content: ''; position: absolute; inset: 3px; background: var(--accent); border-radius: 50%; }
+    .final-info { flex: 1; }
+    .final-date { font-size: .9rem; font-weight: 700; }
+    .final-time { font-size: .76rem; color: var(--text2); margin-top: 3px; }
+  </style>
+</head>
+<body>
+
+  <div class="page-header">
+    <div class="header-top">
+      <h1>日程調整ツール</h1>
+      <div class="header-actions">
+        <button class="hist-btn" id="hist-btn">履歴 <span class="hist-count hidden" id="hist-count">0</span></button>
+        <button class="new-task-btn" id="new-task-btn">+ 新規作成</button>
+      </div>
+    </div>
+    <div class="step-bar">
+      <div class="step-item active" id="si-1">
+        <div class="step-num" id="sn-1">1</div>
+        <div>
+          <div class="step-lbl">A社へ送付</div>
+          <div class="step-sub">候補日を共有</div>
+        </div>
+      </div>
+      <div class="step-connector" id="sc-1"></div>
+      <div class="step-item" id="si-2">
+        <div class="step-num">2</div>
+        <div>
+          <div class="step-lbl">B社へ送付</div>
+          <div class="step-sub">A社の空き時間で打診</div>
+        </div>
+      </div>
+      <div class="step-connector" id="sc-2"></div>
+      <div class="step-item" id="si-3">
+        <div class="step-num">3</div>
+        <div>
+          <div class="step-lbl">A社へ確定連絡</div>
+          <div class="step-sub">決定日程を連絡</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="restore-banner" id="restore-banner" style="display:none">
+    <span><b>前回の作業を復元しました。</b>続きから操作できます。</span>
+    <button id="banner-close">閉じる</button>
+  </div>
+
+  <div class="settings">
+    <div class="field field-subject">
+      <label>件名 / 用件</label>
+      <input type="text" id="s-subject" value="MA" placeholder="例: MA、打ち合わせ">
+    </div>
+    <div class="field">
+      <label>所要時間</label>
+      <select id="s-duration">
+        <option value="30">30 分</option>
+        <option value="60" selected>1 時間</option>
+        <option value="90">1.5 時間</option>
+        <option value="120">2 時間</option>
+        <option value="180">3 時間</option>
+        <option value="0">指定なし</option>
+      </select>
+      <span class="field-dur-note">STEP 2 の時間入力に使用</span>
+    </div>
+  </div>
+
+  <!-- ══ STEP 1：A社へ（日程のみ）══ -->
+  <div id="step1">
+    <div class="layout">
+      <div class="card">
+        <div class="cal-header">
+          <button class="nav-btn" id="prev-month">&#8249;</button>
+          <span class="month-label" id="month-label"></span>
+          <button class="nav-btn" id="next-month">&#8250;</button>
+        </div>
+        <div class="cal-grid" id="cal-grid"></div>
+      </div>
+
+      <div class="right-col">
+        <div class="card">
+          <div class="card-title">候補日（A社へ確認）</div>
+          <div id="date-list">
+            <div class="slots-empty"><span>📅</span>左のカレンダーで<br>日付をクリックして追加</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="output-header">
+            <div class="card-title" style="margin-bottom:0">A社向け文面</div>
+            <button class="copy-btn" id="copy-btn-a">コピー</button>
+          </div>
+          <textarea class="output-textarea" id="output-a" placeholder="日付を選択すると文面が生成されます"></textarea>
+          <button class="tmpl-toggle" id="tmpl-toggle-a">
+            <span class="arrow">▶</span>テンプレートを編集
+          </button>
+          <div class="tmpl-panel" id="tmpl-panel-a">
+            <div class="tmpl-preset-row">
+              <select class="preset-sel" id="preset-sel-a"><option value="">― 保存済みテンプレート ―</option></select>
+              <button class="preset-btn add" id="preset-add-a">+ 新規追加</button>
+              <button class="preset-btn" id="preset-save-a">上書き</button>
+              <button class="preset-btn" id="preset-rename-a" title="名前を変更">改名</button>
+              <button class="preset-btn icon star" id="preset-default-a" title="デフォルトに設定">☆</button>
+              <button class="preset-btn del" id="preset-del-a">削除</button>
+            </div>
+            <div class="field">
+              <label>冒頭文</label>
+              <div class="tmpl-hint">{subject} で件名を展開</div>
+              <textarea id="t-header-a" rows="4">お世話になっております。
+{subject}の日程についてお伺いしたくご連絡いたします。
+
+下記の候補日の中から、ご都合のよい日と当日空いているお時間帯をお知らせください。</textarea>
+            </div>
+            <div class="field">
+              <label>結び文</label>
+              <textarea id="t-footer-a" rows="2">お手数をおかけしますが、何卒よろしくお願いいたします。</textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-nav right">
+      <button class="btn-next" id="to-step2">A社の返答を入力する &rarr;</button>
+    </div>
+  </div>
+
+  <!-- ══ STEP 2：B社へ（A社の空き時間を入力）══ -->
+  <div id="step2" style="display:none">
+    <div class="layout s2">
+      <div class="card">
+        <div class="card-title">A社の空き時間を入力</div>
+        <div class="empty-time-note">A社から届いた空き時間帯を各日に入力／NGの日は「除外」</div>
+        <div id="time-editor"></div>
+        <div class="resp-summary" id="resp-summary"></div>
+      </div>
+
+      <div class="right-col">
+        <div class="card">
+          <div class="output-header">
+            <div class="card-title" style="margin-bottom:0">B社向け文面</div>
+            <button class="copy-btn" id="copy-btn-b">コピー</button>
+          </div>
+          <textarea class="output-textarea" id="output-b" placeholder="A社の空き時間を入力してください"></textarea>
+          <button class="tmpl-toggle" id="tmpl-toggle-b">
+            <span class="arrow">▶</span>テンプレートを編集
+          </button>
+          <div class="tmpl-panel" id="tmpl-panel-b">
+            <div class="tmpl-preset-row">
+              <select class="preset-sel" id="preset-sel-b"><option value="">― 保存済みテンプレート ―</option></select>
+              <button class="preset-btn add" id="preset-add-b">+ 新規追加</button>
+              <button class="preset-btn" id="preset-save-b">上書き</button>
+              <button class="preset-btn" id="preset-rename-b" title="名前を変更">改名</button>
+              <button class="preset-btn icon star" id="preset-default-b" title="デフォルトに設定">☆</button>
+              <button class="preset-btn del" id="preset-del-b">削除</button>
+            </div>
+            <div class="field">
+              <label>冒頭文</label>
+              <div class="tmpl-hint">{subject} で件名を展開</div>
+              <textarea id="t-header-b" rows="4">お世話になっております。
+{subject}の日程についてご連絡いたします。
+
+以下の日程でいかがでしょうか。</textarea>
+            </div>
+            <div class="field">
+              <label>結び文</label>
+              <textarea id="t-footer-b" rows="2">ご都合のよい日程をお知らせいただけますと幸いです。
+何卒よろしくお願いいたします。</textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-nav" style="justify-content:space-between">
+      <button class="btn-back" id="to-step1">&larr; 候補日の編集に戻る</button>
+      <button class="btn-next" id="to-step3">B社からの返答を反映 &rarr;</button>
+    </div>
+  </div>
+
+  <!-- ══ STEP 3：A社へ確定連絡 ══ -->
+  <div id="step3" style="display:none">
+    <div class="layout s2">
+      <div class="card">
+        <div class="card-title">決定した日時を選択</div>
+        <div class="final-hint">B社からの返答に合わせて、決定した日時をクリックで選択してください</div>
+        <div id="final-picker"></div>
+      </div>
+
+      <div class="right-col">
+        <div class="card">
+          <div class="output-header">
+            <div class="card-title" style="margin-bottom:0">A社向け確定文面</div>
+            <button class="copy-btn" id="copy-btn-c">コピー</button>
+          </div>
+          <textarea class="output-textarea" id="output-c" placeholder="決定した日時を選択してください"></textarea>
+          <button class="tmpl-toggle" id="tmpl-toggle-c">
+            <span class="arrow">▶</span>テンプレートを編集
+          </button>
+          <div class="tmpl-panel" id="tmpl-panel-c">
+            <div class="tmpl-preset-row">
+              <select class="preset-sel" id="preset-sel-c"><option value="">― 保存済みテンプレート ―</option></select>
+              <button class="preset-btn add" id="preset-add-c">+ 新規追加</button>
+              <button class="preset-btn" id="preset-save-c">上書き</button>
+              <button class="preset-btn" id="preset-rename-c" title="名前を変更">改名</button>
+              <button class="preset-btn icon star" id="preset-default-c" title="デフォルトに設定">☆</button>
+              <button class="preset-btn del" id="preset-del-c">削除</button>
+            </div>
+            <div class="field">
+              <label>冒頭文</label>
+              <div class="tmpl-hint">{subject} で件名を展開</div>
+              <textarea id="t-header-c" rows="4">お世話になっております。
+{subject}の日程につきまして、下記の通り決定いたしましたのでご連絡いたします。</textarea>
+            </div>
+            <div class="field">
+              <label>結び文</label>
+              <textarea id="t-footer-c" rows="2">当日はどうぞよろしくお願いいたします。</textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-nav" style="justify-content:space-between">
+      <button class="btn-back" id="to-step2-back">&larr; 時間調整に戻る</button>
+      <button class="btn-finish" id="finish-btn">この日程調整を完了する</button>
+    </div>
+  </div>
+
+  <!-- ══ 履歴モーダル ══ -->
+  <div class="modal-overlay" id="hist-modal">
+    <div class="hist-modal-box">
+      <div class="hist-modal-header">
+        <h2>進行中の調整</h2>
+        <button class="modal-close" id="hist-close">✕</button>
+      </div>
+      <div id="hist-list"></div>
+    </div>
+  </div>
+
+  <script>
+    const DOW_JA = ['日','月','火','水','木','金','土'];
+    const NUMS   = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩'];
+
+    const HOLIDAYS = {
+      '2025-01-01':'元旦','2025-01-13':'成人の日','2025-02-11':'建国記念の日',
+      '2025-02-23':'天皇誕生日','2025-02-24':'振替休日','2025-03-20':'春分の日',
+      '2025-04-29':'昭和の日','2025-05-03':'憲法記念日','2025-05-04':'みどりの日',
+      '2025-05-05':'こどもの日','2025-05-06':'振替休日','2025-07-21':'海の日',
+      '2025-08-11':'山の日','2025-09-15':'敬老の日','2025-09-23':'秋分の日',
+      '2025-10-13':'スポーツの日','2025-11-03':'文化の日','2025-11-23':'勤労感謝の日',
+      '2025-11-24':'振替休日',
+      '2026-01-01':'元旦','2026-01-12':'成人の日','2026-02-11':'建国記念の日',
+      '2026-02-23':'天皇誕生日','2026-03-20':'春分の日','2026-04-29':'昭和の日',
+      '2026-05-03':'憲法記念日','2026-05-04':'みどりの日','2026-05-05':'こどもの日',
+      '2026-05-06':'振替休日','2026-07-20':'海の日','2026-08-11':'山の日',
+      '2026-09-21':'敬老の日','2026-09-22':'国民の休日','2026-09-23':'秋分の日',
+      '2026-10-12':'スポーツの日','2026-11-03':'文化の日','2026-11-23':'勤労感謝の日',
+    };
+
+    const QUICK_PRESETS = [];
+    for (let _h = 10; _h <= 19; _h++) QUICK_PRESETS.push({ label: `${_h}:00`, start: `${String(_h).padStart(2,'0')}:00` });
+
+    const today = new Date(); today.setHours(0,0,0,0);
+    let viewYear = today.getFullYear(), viewMonth = today.getMonth();
+    let selected = {}; // { dateKey: [ {start,end}, ... ] }  STEP1は空配列、STEP2で時間を追加
+    let finalSlot = null; // { date, start, end } — STEP 3 で確定した日時
+
+    function dateKey(y,m,d){ return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
+    function parseKey(k){ const [y,m,d]=k.split('-').map(Number); return {y,m:m-1,d}; }
+    function fmtDate(k){ const {y,m,d}=parseKey(k); return `${m+1}月${d}日（${DOW_JA[new Date(y,m,d).getDay()]}）`; }
+    function addMin(t,n){ const [h,mi]=t.split(':').map(Number),s=h*60+mi+n; return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; }
+    function getDur(){ return parseInt(document.getElementById('s-duration').value); }
+
+    // ── TimeSel ──────────────────────────────────────
+    function makeTimeSel(timeStr) {
+      let [h,m] = timeStr ? timeStr.split(':').map(Number) : [10,0];
+      const listeners = []; const fire = () => listeners.forEach(fn=>fn());
+      const root = document.createElement('div'); root.className='ts-root';
+      const btn  = document.createElement('button'); btn.type='button'; btn.className='ts-btn';
+
+      function refreshDisplay(){
+        btn.textContent=`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+        root.querySelectorAll('.ts-h-opt').forEach(el=>el.classList.toggle('sel',+el.dataset.v===h));
+        root.querySelectorAll('.ts-m-opt').forEach(el=>el.classList.toggle('sel',+el.dataset.v===m));
+      }
+
+      const picker=document.createElement('div'); picker.className='ts-picker'; picker.style.display='none';
+      const hList=document.createElement('div'); hList.className='ts-h-list';
+      for(let i=0;i<=23;i++){
+        const o=document.createElement('button'); o.type='button'; o.className='ts-h-opt'; o.dataset.v=i;
+        o.textContent=String(i).padStart(2,'0');
+        o.addEventListener('mousedown',e=>{e.preventDefault();h=i;refreshDisplay();fire();});
+        hList.appendChild(o);
+      }
+      const mList=document.createElement('div'); mList.className='ts-m-list';
+      [0,15,30,45].forEach(mi=>{
+        const o=document.createElement('button'); o.type='button'; o.className='ts-m-opt'; o.dataset.v=mi;
+        o.textContent=String(mi).padStart(2,'0');
+        o.addEventListener('mousedown',e=>{e.preventDefault();m=mi;refreshDisplay();fire();closePicker();});
+        mList.appendChild(o);
+      });
+      picker.append(hList,mList);
+
+      const editWrap=document.createElement('div'); editWrap.className='ts-edit'; editWrap.style.display='none';
+      function mkNum(init,min,max){
+        const inp=document.createElement('input'); inp.type='number'; inp.min=min; inp.max=max; inp.step=1;
+        inp.value=String(init).padStart(2,'0');
+        inp.addEventListener('focus',()=>inp.select());
+        inp.addEventListener('blur',()=>{ let v=parseInt(inp.value); if(isNaN(v))v=init; inp.value=String(Math.max(min,Math.min(max,v))).padStart(2,'0'); });
+        inp.addEventListener('keydown',e=>{if(e.key==='Enter')inp.blur();});
+        return inp;
+      }
+      const hIn=mkNum(h,0,23), mIn=mkNum(m,0,59);
+      const ecolon=document.createElement('span'); ecolon.className='ts-ecolon'; ecolon.textContent=':';
+      editWrap.append(hIn,ecolon,mIn);
+
+      function commitEdit(){ h=Math.max(0,Math.min(23,parseInt(hIn.value)||0)); m=Math.max(0,Math.min(59,parseInt(mIn.value)||0)); refreshDisplay(); fire(); }
+      let mode='display';
+      function openPicker(){ mode='picker'; btn.style.display=''; btn.classList.add('active'); editWrap.style.display='none'; picker.style.display='flex'; refreshDisplay(); const cur=hList.querySelector(`[data-v="${h}"]`); if(cur)setTimeout(()=>cur.scrollIntoView({block:'center'}),0); }
+      function closePicker(){ mode='display'; picker.style.display='none'; btn.classList.remove('active'); }
+      function openEdit(){ mode='edit'; btn.style.display='none'; picker.style.display='none'; editWrap.style.display=''; hIn.value=String(h).padStart(2,'0'); mIn.value=String(m).padStart(2,'0'); setTimeout(()=>{hIn.focus();hIn.select();},0); }
+      function closeEdit(){ commitEdit(); mode='display'; btn.style.display=''; editWrap.style.display='none'; }
+
+      let clickTimer=null;
+      btn.addEventListener('click',()=>{ if(clickTimer){clearTimeout(clickTimer);clickTimer=null;return;} clickTimer=setTimeout(()=>{clickTimer=null; mode==='picker'?closePicker():openPicker();},220); });
+      btn.addEventListener('dblclick',()=>{ clearTimeout(clickTimer);clickTimer=null; openEdit(); });
+      document.addEventListener('mousedown',e=>{ if(!root.contains(e.target)){ if(mode==='picker')closePicker(); else if(mode==='edit')closeEdit(); } });
+
+      root.append(btn,picker,editWrap); refreshDisplay();
+      root.getValue=()=>`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+      root.setValue=t=>{[h,m]=t.split(':').map(Number);refreshDisplay();};
+      root.addChangeListener=fn=>listeners.push(fn);
+      return root;
+    }
+
+    // ── Calendar ─────────────────────────────────────
+    function renderCalendar(){
+      document.getElementById('month-label').textContent=`${viewYear}年${viewMonth+1}月`;
+      const grid=document.getElementById('cal-grid'); grid.innerHTML='';
+      DOW_JA.forEach((d,i)=>{ const el=document.createElement('div'); el.className='cal-dow'+(i===0?' sun':i===6?' sat':''); el.textContent=d; grid.appendChild(el); });
+      const first=new Date(viewYear,viewMonth,1).getDay(), days=new Date(viewYear,viewMonth+1,0).getDate();
+      for(let i=0;i<first;i++) grid.appendChild(Object.assign(document.createElement('div'),{className:'cal-day empty'}));
+      for(let d=1;d<=days;d++){
+        const dt=new Date(viewYear,viewMonth,d), k=dateKey(viewYear,viewMonth,d), dow=dt.getDay();
+        const el=document.createElement('div');
+        let cls='cal-day';
+        if(dt<today) cls+=' past';
+        else if(dt.getTime()===today.getTime()) cls+=' today';
+        if(dow===0) cls+=' sun'; else if(dow===6) cls+=' sat';
+        if(HOLIDAYS[k]) cls+=' holiday';
+        if(selected[k]) cls+=' selected';
+        el.className=cls; el.textContent=d;
+        if(HOLIDAYS[k]) el.title=HOLIDAYS[k];
+        if(dt>=today) el.addEventListener('click',()=>toggleDate(k));
+        grid.appendChild(el);
+      }
+    }
+    function toggleDate(k){ if(selected[k])delete selected[k]; else selected[k]=[]; renderCalendar();renderDateList();regenerateA(); }
+
+    // ── STEP 1: 候補日リスト（日付＋オプションで時間）─
+    function renderDateList(){
+      const c=document.getElementById('date-list');
+      const keys=Object.keys(selected).sort();
+      if(!keys.length){ c.innerHTML='<div class="slots-empty"><span>📅</span>左のカレンダーで<br>日付をクリックして追加</div>'; return; }
+      c.innerHTML='';
+      keys.forEach(k=>{
+        if(selected[k].length>0) c.appendChild(makeDateItemA(k));
+        else c.appendChild(makeSimpleRowA(k));
+      });
+    }
+
+    function makeSimpleRowA(k){
+      const row=document.createElement('div'); row.className='date-row';
+      const lbl=document.createElement('span'); lbl.className='date-label'; lbl.textContent=fmtDate(k);
+      if(HOLIDAYS[k]){ const hn=document.createElement('span'); hn.className='holiday-name'; hn.textContent=HOLIDAYS[k]; lbl.appendChild(hn); }
+      const actions=document.createElement('div'); actions.className='date-row-actions';
+      const addTime=document.createElement('button'); addTime.className='add-time-btn'; addTime.textContent='+ 時間も追加';
+      addTime.title='この日に時間帯を指定する';
+      addTime.addEventListener('click',()=>{
+        const dur=getDur();
+        selected[k].push({ start:'10:00', end: dur>0 ? addMin('10:00',dur) : '' });
+        renderDateList(); regenerateA();
+      });
+      const rm=document.createElement('button'); rm.className='remove-date'; rm.textContent='×';
+      rm.addEventListener('click',()=>{ delete selected[k]; renderCalendar();renderDateList();regenerateA(); });
+      actions.append(addTime, rm);
+      row.append(lbl, actions);
+      return row;
+    }
+
+    function makeDateItemA(k){
+      const item=document.createElement('div'); item.className='date-item';
+      const hdr=document.createElement('div'); hdr.className='date-item-header';
+      const lbl=document.createElement('span'); lbl.className='date-label'; lbl.textContent=fmtDate(k);
+      if(HOLIDAYS[k]){ const hn=document.createElement('span'); hn.className='holiday-name'; hn.textContent=HOLIDAYS[k]; lbl.appendChild(hn); }
+      const rm=document.createElement('button'); rm.className='remove-date'; rm.textContent='×';
+      rm.title='この日を候補から削除';
+      rm.addEventListener('click',()=>{ delete selected[k]; renderCalendar();renderDateList();regenerateA(); });
+      hdr.append(lbl, rm); item.appendChild(hdr);
+
+      const sl=document.createElement('div'); sl.className='slot-list';
+      selected[k].forEach((slot,idx)=>sl.appendChild(makeSlotRowA(k,idx,slot)));
+      item.appendChild(sl);
+
+      const acts=document.createElement('div'); acts.className='slot-actions';
+      QUICK_PRESETS.forEach(p=>{
+        const b=document.createElement('button'); b.className='quick-btn'; b.textContent=p.label;
+        b.addEventListener('click',()=>{ const dur=getDur(); selected[k].push({start:p.start,end:dur>0?addMin(p.start,dur):''}); renderDateList(); regenerateA(); });
+        acts.appendChild(b);
+      });
+      const add=document.createElement('button'); add.className='add-slot-btn'; add.textContent='+ 追加';
+      add.addEventListener('click',()=>{ const dur=getDur(),last=selected[k].at(-1),st=last?.start||'10:00'; selected[k].push({start:st,end:dur>0?addMin(st,dur):''}); renderDateList(); regenerateA(); });
+      acts.appendChild(add); item.appendChild(acts);
+      return item;
+    }
+
+    function makeSlotRowA(k,idx,slot){
+      const row=document.createElement('div'); row.className='slot-row';
+      const sSel=makeTimeSel(slot.start), eSel=makeTimeSel(slot.end);
+      sSel.addChangeListener(()=>{ selected[k][idx].start=sSel.getValue(); const dur=getDur(); if(dur>0){const e=addMin(sSel.getValue(),dur);selected[k][idx].end=e;eSel.setValue(e);} regenerateA(); });
+      eSel.addChangeListener(()=>{ selected[k][idx].end=eSel.getValue(); regenerateA(); });
+      const sep=document.createElement('span'); sep.className='slot-sep'; sep.textContent='〜';
+      row.append(sSel,sep,eSel);
+      const del=document.createElement('button'); del.className='del-slot'; del.textContent='×';
+      del.addEventListener('click',()=>{ selected[k].splice(idx,1); renderDateList(); regenerateA(); });
+      row.appendChild(del);
+      return row;
+    }
+
+    // ── Generate A（日付＋指定があれば時間も）─────────
+    function regenerateA(){
+      saveSession();
+      const subj=document.getElementById('s-subject').value.trim()||'打ち合わせ';
+      const hdr=document.getElementById('t-header-a').value, ftr=document.getElementById('t-footer-a').value;
+      const keys=Object.keys(selected).sort(), out=document.getElementById('output-a');
+      if(!keys.length){ out.value=''; return; }
+      const lines=[hdr.replace(/\{subject\}/g,subj),''];
+      let i=0;
+      keys.forEach(k=>{
+        if(selected[k].length>0){
+          selected[k].forEach(slot=>{
+            const n=NUMS[i]||`${i+1}.`;
+            let ln=`${n}  ${fmtDate(k)}`;
+            if(slot.start){ ln+=`  ${slot.start}`; if(slot.end) ln+=` 〜 ${slot.end}`; }
+            lines.push(ln); i++;
+          });
+        } else {
+          const n=NUMS[i]||`${i+1}.`;
+          lines.push(`${n}  ${fmtDate(k)}`); i++;
+        }
+      });
+      lines.push('',ftr); out.value=lines.join('\n');
+    }
+
+    // ── STEP 2: 時間エディタ ──────────────────────────
+    function renderTimeEditor(){
+      const c=document.getElementById('time-editor');
+      const keys=Object.keys(selected).sort();
+      if(!keys.length){ c.innerHTML='<div class="slots-empty"><span>📅</span>候補日がありません</div>'; document.getElementById('resp-summary').textContent=''; return; }
+      c.innerHTML='';
+      let slotCount=0;
+      keys.forEach(k=>{
+        const item=document.createElement('div'); item.className='date-item';
+        const hdr=document.createElement('div'); hdr.className='date-item-header';
+        const lbl=document.createElement('span'); lbl.className='date-label'; lbl.textContent=fmtDate(k);
+        if(HOLIDAYS[k]){ const hn=document.createElement('span'); hn.className='holiday-name'; hn.textContent=HOLIDAYS[k]; lbl.appendChild(hn); }
+        const ng=document.createElement('button'); ng.className='ng-btn'; ng.textContent='除外';
+        ng.title='A社がNGの日はここで除外';
+        ng.addEventListener('click',()=>{ delete selected[k]; renderTimeEditor();regenerateB(); });
+        hdr.append(lbl,ng); item.appendChild(hdr);
+
+        if(selected[k].length){
+          const sl=document.createElement('div'); sl.className='slot-list';
+          selected[k].forEach((slot,idx)=>sl.appendChild(makeSlotRow(k,idx,slot)));
+          item.appendChild(sl);
+          slotCount+=selected[k].length;
+        } else {
+          const note=document.createElement('div'); note.className='empty-time-note'; note.textContent='↓ プリセットか「+追加」で時間を入力';
+          item.appendChild(note);
+        }
+
+        const acts=document.createElement('div'); acts.className='slot-actions';
+        QUICK_PRESETS.forEach(p=>{
+          const b=document.createElement('button'); b.className='quick-btn'; b.textContent=p.label;
+          b.addEventListener('click',()=>{ const dur=getDur(); selected[k].push({start:p.start,end:dur>0?addMin(p.start,dur):''}); renderTimeEditor();regenerateB(); });
+          acts.appendChild(b);
+        });
+        const add=document.createElement('button'); add.className='add-slot-btn'; add.textContent='+ 追加';
+        add.addEventListener('click',()=>{ const dur=getDur(),last=selected[k].at(-1),st=last?.start||'10:00'; selected[k].push({start:st,end:dur>0?addMin(st,dur):''}); renderTimeEditor();regenerateB(); });
+        acts.appendChild(add); item.appendChild(acts); c.appendChild(item);
+      });
+      document.getElementById('resp-summary').innerHTML = slotCount ? `B社へ <b>${slotCount}</b> 件の日時を打診` : '時間を入力してください';
+    }
+
+    function makeSlotRow(k,idx,slot){
+      const row=document.createElement('div'); row.className='slot-row';
+      const sSel=makeTimeSel(slot.start), eSel=makeTimeSel(slot.end);
+      sSel.addChangeListener(()=>{ selected[k][idx].start=sSel.getValue(); const dur=getDur(); if(dur>0){const e=addMin(sSel.getValue(),dur);selected[k][idx].end=e;eSel.setValue(e);} regenerateB(); });
+      eSel.addChangeListener(()=>{ selected[k][idx].end=eSel.getValue(); regenerateB(); });
+      const sep=document.createElement('span'); sep.className='slot-sep'; sep.textContent='〜';
+      row.append(sSel,sep,eSel);
+      const del=document.createElement('button'); del.className='del-slot'; del.textContent='×';
+      del.addEventListener('click',()=>{ selected[k].splice(idx,1); renderTimeEditor();regenerateB(); });
+      row.appendChild(del);
+      return row;
+    }
+
+    // ── Generate B（日付 + 時間）──────────────────────
+    function regenerateB(){
+      saveSession();
+      const subj=document.getElementById('s-subject').value.trim()||'打ち合わせ';
+      const hdr=document.getElementById('t-header-b').value, ftr=document.getElementById('t-footer-b').value;
+      const out=document.getElementById('output-b');
+      const list=[];
+      Object.keys(selected).sort().forEach(k=>selected[k].forEach(s=>{ if(s.start)list.push({k,slot:s}); }));
+      if(!list.length){ out.value=''; return; }
+      const lines=[hdr.replace(/\{subject\}/g,subj),''];
+      list.forEach(({k,slot},i)=>{ const n=NUMS[i]||`${i+1}.`; let ln=`${n}  ${fmtDate(k)}  ${slot.start}`; if(slot.end)ln+=` 〜 ${slot.end}`; lines.push(ln); });
+      lines.push('',ftr); out.value=lines.join('\n');
+    }
+
+    // ── Step switching ───────────────────────────────
+    function setStepView(n){
+      for(let i=1;i<=3;i++) document.getElementById('step'+i).style.display = (i===n?'block':'none');
+      for(let i=1;i<=3;i++){
+        const si=document.getElementById('si-'+i);
+        const sn=si.querySelector('.step-num');
+        si.classList.remove('active','done');
+        if(i<n){ si.classList.add('done'); sn.textContent='✓'; }
+        else if(i===n){ si.classList.add('active'); sn.textContent=String(i); }
+        else { sn.textContent=String(i); }
+      }
+      for(let i=1;i<=2;i++){
+        document.getElementById('sc-'+i).classList.toggle('done', i<n);
+      }
+    }
+    function enterStep2(){
+      if(!Object.keys(selected).length){ alert('候補日を追加してください'); return; }
+      setStepView(2); renderTimeEditor(); regenerateB(); saveSession();
+    }
+    function exitStep2(){
+      setStepView(1); renderCalendar(); renderDateList(); regenerateA(); saveSession();
+    }
+    function enterStep3(){
+      const hasSlots = Object.keys(selected).some(k=>selected[k].length>0);
+      if(!hasSlots){ alert('決定する日時がありません。\nSTEP 2 で各日に時間を入力してください。'); return; }
+      setStepView(3); validateFinalSlot(); renderFinalPicker(); regenerateC(); saveSession();
+    }
+    function exitStep3(){
+      setStepView(2); renderTimeEditor(); regenerateB(); saveSession();
+    }
+
+    function validateFinalSlot(){
+      if(!finalSlot) return;
+      const arr = selected[finalSlot.date];
+      if(!arr || !arr.some(s=>s.start===finalSlot.start)) finalSlot = null;
+    }
+
+    function renderFinalPicker(){
+      const c=document.getElementById('final-picker');
+      const keys=Object.keys(selected).sort();
+      let count=0; keys.forEach(k=>count+=selected[k].length);
+      if(!count){ c.innerHTML='<div class="slots-empty"><span>📅</span>確定する日時がありません</div>'; return; }
+      c.innerHTML='';
+      keys.forEach(k=>{
+        selected[k].forEach(slot=>{
+          const isF = finalSlot && finalSlot.date===k && finalSlot.start===slot.start;
+          const item=document.createElement('div'); item.className='final-item'+(isF?' selected':'');
+          const radio=document.createElement('div'); radio.className='final-radio';
+          const info=document.createElement('div'); info.className='final-info';
+          const dd=document.createElement('div'); dd.className='final-date'; dd.textContent=fmtDate(k);
+          const dt=document.createElement('div'); dt.className='final-time'; dt.textContent=slot.start+(slot.end?' 〜 '+slot.end:'');
+          info.append(dd,dt); item.append(radio,info);
+          item.addEventListener('click',()=>{
+            finalSlot = { date:k, start:slot.start, end:slot.end };
+            renderFinalPicker(); regenerateC();
+          });
+          c.appendChild(item);
+        });
+      });
+    }
+
+    // ── Generate C（確定文面）─────────────────────────
+    function regenerateC(){
+      saveSession();
+      const subj=document.getElementById('s-subject').value.trim()||'打ち合わせ';
+      const hdr=document.getElementById('t-header-c').value, ftr=document.getElementById('t-footer-c').value;
+      const out=document.getElementById('output-c');
+      if(!finalSlot){ out.value=''; return; }
+      const dtStr = `${fmtDate(finalSlot.date)}  ${finalSlot.start}${finalSlot.end?' 〜 '+finalSlot.end:''}`;
+      const headerOut = hdr.replace(/\{subject\}/g,subj);
+      out.value = `${headerOut}\n\n${dtStr}\n\n${ftr}`;
+    }
+
+    // ── Copy ──────────────────────────────────────────
+    function setupCopy(btnId,taId){
+      document.getElementById(btnId).addEventListener('click',()=>{
+        const t=document.getElementById(taId).value; if(!t)return;
+        navigator.clipboard.writeText(t).then(()=>{
+          const b=document.getElementById(btnId); b.textContent='コピーしました'; b.classList.add('copied');
+          setTimeout(()=>{ b.textContent='コピー'; b.classList.remove('copied'); },1800);
+        });
+      });
+    }
+    setupCopy('copy-btn-a','output-a'); setupCopy('copy-btn-b','output-b'); setupCopy('copy-btn-c','output-c');
+
+    // ── Template toggles ─────────────────────────────
+    function setupToggle(tid,pid){
+      document.getElementById(tid).addEventListener('click',()=>{
+        const o=document.getElementById(pid).classList.toggle('open');
+        document.getElementById(tid).classList.toggle('open',o);
+      });
+    }
+    setupToggle('tmpl-toggle-a','tmpl-panel-a'); setupToggle('tmpl-toggle-b','tmpl-panel-b'); setupToggle('tmpl-toggle-c','tmpl-panel-c');
+
+    // ── Persistence helpers ──────────────────────────
+    const gv  = id => document.getElementById(id).value;
+    const setv = (id,v) => { document.getElementById(id).value = v; };
+    const escapeHtml = s => String(s ?? '').replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]);
+
+    const HIST_KEY = 'schedule_histories';
+    const ACTIVE_KEY = 'schedule_active_id';
+    let activeHistoryId = null;
+
+    function getHistories(){ try { return JSON.parse(localStorage.getItem(HIST_KEY))||[]; } catch(e){ return []; } }
+    function setHistoriesArr(arr){ try { localStorage.setItem(HIST_KEY, JSON.stringify(arr)); } catch(e){} }
+    function setActive(id){ if(id){ localStorage.setItem(ACTIVE_KEY, id); } else { localStorage.removeItem(ACTIVE_KEY); } }
+    function newHistId(){ return 'h' + Date.now().toString(36) + Math.floor(Math.random()*1000).toString(36); }
+
+    function saveSession(){
+      validateFinalSlot();
+      const arr = getHistories();
+      if(!Object.keys(selected).length){
+        if(activeHistoryId){
+          const idx = arr.findIndex(h=>h.id===activeHistoryId);
+          if(idx>=0){ arr.splice(idx,1); setHistoriesArr(arr); }
+          activeHistoryId = null; setActive(null);
+        }
+        updateHistCount();
+        return;
+      }
+      if(!activeHistoryId){ activeHistoryId = newHistId(); setActive(activeHistoryId); }
+      let step = 1;
+      if(document.getElementById('step3').style.display==='block') step = 3;
+      else if(document.getElementById('step2').style.display==='block') step = 2;
+      const entry = {
+        id: activeHistoryId,
+        subject: gv('s-subject'),
+        selected,
+        finalSlot,
+        step,
+        duration: gv('s-duration'),
+        vY: viewYear, vM: viewMonth,
+        updatedAt: Date.now(),
+      };
+      const idx = arr.findIndex(h=>h.id===activeHistoryId);
+      if(idx>=0) arr[idx] = entry; else arr.unshift(entry);
+      setHistoriesArr(arr);
+      updateHistCount();
+    }
+
+    function loadHistory(id){
+      const arr = getHistories();
+      const h = arr.find(x=>x.id===id);
+      if(!h) return false;
+      activeHistoryId = id; setActive(id);
+      selected = h.selected || {};
+      finalSlot = h.finalSlot || null;
+      setv('s-subject', h.subject ?? 'MA');
+      setv('s-duration', h.duration ?? '60');
+      viewYear  = h.vY ?? today.getFullYear();
+      viewMonth = h.vM ?? today.getMonth();
+      document.getElementById('output-b').value = '';
+      document.getElementById('output-c').value = '';
+      setStepView(1);
+      renderCalendar(); renderDateList(); regenerateA();
+      if(h.step===3){ setStepView(3); renderTimeEditor(); regenerateB(); validateFinalSlot(); renderFinalPicker(); regenerateC(); }
+      else if(h.step===2){ setStepView(2); renderTimeEditor(); regenerateB(); }
+      updateHistCount();
+      return true;
+    }
+
+    function deleteHistory(id){
+      const arr = getHistories().filter(h=>h.id!==id);
+      setHistoriesArr(arr);
+      if(activeHistoryId === id){ activeHistoryId = null; setActive(null); }
+      updateHistCount();
+    }
+
+    function fmtUpdated(ts){
+      const d = new Date(ts);
+      const m = d.getMonth()+1, day = d.getDate();
+      const hh = String(d.getHours()).padStart(2,'0'), mm = String(d.getMinutes()).padStart(2,'0');
+      return `${m}/${day} ${hh}:${mm}`;
+    }
+
+    function renderHistoryList(){
+      const list = document.getElementById('hist-list');
+      const arr = getHistories().slice().sort((a,b)=>b.updatedAt-a.updatedAt);
+      if(!arr.length){ list.innerHTML = '<div class="hist-empty">進行中の調整はありません</div>'; return; }
+      list.innerHTML = '';
+      arr.forEach(h=>{
+        const item = document.createElement('div');
+        item.className = 'hist-item' + (h.id===activeHistoryId ? ' active':'');
+        const dates = Object.keys(h.selected||{}).length;
+        const stepCls = h.step===3 ? 's3' : (h.step===2 ? 's2' : '');
+        item.innerHTML = `
+          <div class="hist-info">
+            <div class="hist-title">${escapeHtml(h.subject || '(無題)')}</div>
+            <div class="hist-meta"><span class="hist-step ${stepCls}">STEP ${h.step||1}</span>候補日 ${dates}件 · ${fmtUpdated(h.updatedAt)} 更新</div>
+          </div>
+          <button class="hist-del" title="この履歴を削除">✕</button>
+        `;
+        item.addEventListener('click', e=>{
+          if(e.target.classList.contains('hist-del')) return;
+          loadHistory(h.id);
+          closeHistModal();
+        });
+        item.querySelector('.hist-del').addEventListener('click', e=>{
+          e.stopPropagation();
+          if(!confirm(`「${h.subject || '(無題)'}」の履歴を削除しますか？`)) return;
+          deleteHistory(h.id);
+          // 削除したのがアクティブなら画面状態もリセット
+          if(!getHistories().find(x=>x.id===activeHistoryId)){
+            selected = {}; setv('s-subject','MA');
+            viewYear = today.getFullYear(); viewMonth = today.getMonth();
+            setStepView(1); document.getElementById('output-b').value='';
+            renderCalendar(); renderDateList(); regenerateA();
+            document.getElementById('restore-banner').style.display='none';
+          }
+          renderHistoryList();
+        });
+        list.appendChild(item);
+      });
+    }
+
+    function openHistModal(){ renderHistoryList(); document.getElementById('hist-modal').classList.add('open'); }
+    function closeHistModal(){ document.getElementById('hist-modal').classList.remove('open'); }
+
+    function updateHistCount(){
+      const n = getHistories().length;
+      const el = document.getElementById('hist-count');
+      el.textContent = n;
+      el.classList.toggle('hidden', n===0);
+    }
+
+    // ── Template current (always persisted) ──────────
+    function saveTmplCurrent(){
+      try {
+        const aArr=getPresets('a'), bArr=getPresets('b'), cArr=getPresets('c');
+        const selAVal=document.getElementById('preset-sel-a').value;
+        const selBVal=document.getElementById('preset-sel-b').value;
+        const selCVal=document.getElementById('preset-sel-c').value;
+        localStorage.setItem('tmpl_current', JSON.stringify({
+          ha: gv('t-header-a'), fa: gv('t-footer-a'),
+          hb: gv('t-header-b'), fb: gv('t-footer-b'),
+          hc: gv('t-header-c'), fc: gv('t-footer-c'),
+          selA: (selAVal!=='' && aArr[selAVal]) ? aArr[selAVal].name : null,
+          selB: (selBVal!=='' && bArr[selBVal]) ? bArr[selBVal].name : null,
+          selC: (selCVal!=='' && cArr[selCVal]) ? cArr[selCVal].name : null,
+        }));
+      } catch(e){}
+    }
+    function loadTmplCurrent(){
+      let t; try { t = JSON.parse(localStorage.getItem('tmpl_current')); } catch(e){ return; }
+      if(!t) return;
+      if(t.ha!=null) setv('t-header-a',t.ha);
+      if(t.fa!=null) setv('t-footer-a',t.fa);
+      if(t.hb!=null) setv('t-header-b',t.hb);
+      if(t.fb!=null) setv('t-footer-b',t.fb);
+      if(t.hc!=null) setv('t-header-c',t.hc);
+      if(t.fc!=null) setv('t-footer-c',t.fc);
+      if(t.selA){ const i=getPresets('a').findIndex(p=>p.name===t.selA); if(i>=0) document.getElementById('preset-sel-a').value=i; }
+      if(t.selB){ const i=getPresets('b').findIndex(p=>p.name===t.selB); if(i>=0) document.getElementById('preset-sel-b').value=i; }
+      if(t.selC){ const i=getPresets('c').findIndex(p=>p.name===t.selC); if(i>=0) document.getElementById('preset-sel-c').value=i; }
+    }
+
+    // ── Template presets (named) ─────────────────────
+    function getPresets(w){ try { return JSON.parse(localStorage.getItem('tmpl_presets_'+w))||[]; } catch(e){ return []; } }
+    function setPresets(w,arr){ try { localStorage.setItem('tmpl_presets_'+w, JSON.stringify(arr)); } catch(e){} }
+    function getDefault(w){ return localStorage.getItem('tmpl_default_'+w) || ''; }
+    function setDefault(w,name){ if(name) localStorage.setItem('tmpl_default_'+w, name); else localStorage.removeItem('tmpl_default_'+w); }
+    function refreshPresetList(w){
+      const sel=document.getElementById('preset-sel-'+w);
+      const cur=sel.value;
+      const def=getDefault(w);
+      sel.innerHTML='<option value="">― 保存済みテンプレート ―</option>';
+      getPresets(w).forEach((p,i)=>{
+        const o=document.createElement('option'); o.value=i;
+        o.textContent=(p.name===def ? '★ ' : '')+p.name;
+        sel.appendChild(o);
+      });
+      // 元の選択を復元（存在すれば）
+      if(cur!=='' && getPresets(w)[cur]) sel.value=cur;
+    }
+    function updateDefaultBtn(w){
+      const sel=document.getElementById('preset-sel-'+w);
+      const btn=document.getElementById('preset-default-'+w);
+      if(!btn) return;
+      const i=sel.value;
+      if(i===''){ btn.disabled=true; btn.textContent='☆'; btn.classList.remove('on'); btn.title='デフォルトに設定'; return; }
+      btn.disabled=false;
+      const arr=getPresets(w);
+      const isDef = arr[i] && arr[i].name === getDefault(w);
+      btn.textContent = isDef ? '★' : '☆';
+      btn.classList.toggle('on', isDef);
+      btn.title = isDef ? 'デフォルトを解除' : 'デフォルトに設定';
+    }
+    function updateSaveBtnState(w){
+      const sel=document.getElementById('preset-sel-'+w);
+      const hasSel = sel.value !== '';
+      document.getElementById('preset-save-'+w).disabled = !hasSel;
+      document.getElementById('preset-del-'+w).disabled  = !hasSel;
+      const rn=document.getElementById('preset-rename-'+w); if(rn) rn.disabled = !hasSel;
+      updateDefaultBtn(w);
+    }
+    function setupPresets(w, headerId, footerId, regen){
+      refreshPresetList(w);
+      updateSaveBtnState(w);
+      document.getElementById('preset-sel-'+w).addEventListener('change', e=>{
+        updateSaveBtnState(w);
+        const i=e.target.value; if(i==='') { saveTmplCurrent(); return; }
+        const p=getPresets(w)[i];
+        if(p){ setv(headerId,p.header); setv(footerId,p.footer); regen(); saveTmplCurrent(); }
+      });
+      // + 新規追加
+      document.getElementById('preset-add-'+w).addEventListener('click', ()=>{
+        const raw=(prompt('テンプレート名を入力してください')||'').trim();
+        if(!raw) return;
+        const arr=getPresets(w);
+        let name=raw, n=2;
+        while(arr.some(p=>p.name===name)) name = `${raw} (${n++})`;
+        arr.push({ name, header:gv(headerId), footer:gv(footerId) });
+        setPresets(w,arr); refreshPresetList(w);
+        document.getElementById('preset-sel-'+w).value = arr.length-1;
+        updateSaveBtnState(w); saveTmplCurrent();
+      });
+      // 上書き
+      document.getElementById('preset-save-'+w).addEventListener('click', ()=>{
+        const sel=document.getElementById('preset-sel-'+w), i=sel.value;
+        if(i===''){ alert('上書きするテンプレートを選択してください。\n新しく登録する場合は「+ 新規追加」を押してください。'); return; }
+        const arr=getPresets(w);
+        const target=arr[i]; if(!target){ alert('対象が見つかりません'); refreshPresetList(w); return; }
+        if(!confirm(`「${target.name}」を現在の内容で上書きしますか？`)) return;
+        arr[i] = { name: target.name, header:gv(headerId), footer:gv(footerId) };
+        setPresets(w,arr); refreshPresetList(w);
+        sel.value = i; updateSaveBtnState(w);
+      });
+      // ✎ 名前変更
+      document.getElementById('preset-rename-'+w).addEventListener('click', ()=>{
+        const sel=document.getElementById('preset-sel-'+w), i=sel.value;
+        if(i===''){ alert('名前を変更するテンプレートを選択してください'); return; }
+        const arr=getPresets(w);
+        const target=arr[i]; if(!target){ alert('対象が見つかりません'); refreshPresetList(w); return; }
+        const newName=(prompt('新しい名前を入力してください', target.name)||'').trim();
+        if(!newName || newName===target.name) return;
+        if(arr.some((p,idx)=>idx!=i && p.name===newName)){ alert('同じ名前のテンプレートが既にあります'); return; }
+        const wasDefault = getDefault(w)===target.name;
+        target.name = newName;
+        setPresets(w,arr);
+        if(wasDefault) setDefault(w,newName);
+        refreshPresetList(w);
+        sel.value = i; updateSaveBtnState(w); saveTmplCurrent();
+      });
+      // ☆ デフォルト
+      document.getElementById('preset-default-'+w).addEventListener('click', ()=>{
+        const sel=document.getElementById('preset-sel-'+w), i=sel.value;
+        if(i==='') return;
+        const arr=getPresets(w);
+        const target=arr[i]; if(!target) return;
+        if(getDefault(w)===target.name) setDefault(w,null);
+        else setDefault(w,target.name);
+        refreshPresetList(w);
+        sel.value = i; updateSaveBtnState(w);
+      });
+      // 削除
+      document.getElementById('preset-del-'+w).addEventListener('click', ()=>{
+        const sel=document.getElementById('preset-sel-'+w), i=sel.value;
+        if(i===''){ alert('削除するテンプレートを選択してください'); return; }
+        const arr=getPresets(w);
+        if(!confirm('「'+arr[i].name+'」を削除しますか？')) return;
+        const wasDefault = getDefault(w)===arr[i].name;
+        arr.splice(i,1); setPresets(w,arr);
+        if(wasDefault) setDefault(w,null);
+        refreshPresetList(w);
+        updateSaveBtnState(w); saveTmplCurrent();
+      });
+    }
+
+    // ── Reset & Finish ───────────────────────────────
+    // 状態だけリセット（履歴は保持）：新規作成用
+    function resetState(){
+      activeHistoryId = null; setActive(null);
+      selected = {};
+      finalSlot = null;
+      setv('s-subject','MA');
+      viewYear = today.getFullYear(); viewMonth = today.getMonth();
+      setStepView(1);
+      document.getElementById('restore-banner').style.display='none';
+      document.getElementById('output-b').value='';
+      document.getElementById('output-c').value='';
+      renderCalendar(); renderDateList(); regenerateA();
+    }
+    // 履歴ごと削除して初期化
+    function finishTask(){
+      if(!confirm('この日程調整を完了しますか？\n履歴からも削除され、最初の画面に戻ります。\n（テンプレートは保持されます）')) return;
+      if(activeHistoryId) deleteHistory(activeHistoryId);
+      resetState();
+    }
+    // 新規作成（現在のタスクは履歴に残したまま新しいタスク開始）
+    function newTask(){
+      if(activeHistoryId && Object.keys(selected).length){
+        // 現状を保存してから切り替え（saveSessionは別IDで上書きしないよう activeHistoryId をクリア後にやる）
+      }
+      resetState();
+    }
+
+    // ── Events ───────────────────────────────────────
+    document.getElementById('to-step2').addEventListener('click', enterStep2);
+    document.getElementById('to-step1').addEventListener('click', exitStep2);
+    document.getElementById('to-step3').addEventListener('click', enterStep3);
+    document.getElementById('to-step2-back').addEventListener('click', exitStep3);
+    document.getElementById('finish-btn').addEventListener('click', finishTask);
+    document.getElementById('new-task-btn').addEventListener('click', newTask);
+    document.getElementById('hist-btn').addEventListener('click', openHistModal);
+    document.getElementById('hist-close').addEventListener('click', closeHistModal);
+    document.getElementById('hist-modal').addEventListener('click', e=>{ if(e.target.id==='hist-modal') closeHistModal(); });
+    document.getElementById('banner-close').addEventListener('click', ()=>{ document.getElementById('restore-banner').style.display='none'; });
+    document.getElementById('prev-month').addEventListener('click',()=>{ if(--viewMonth<0){viewMonth=11;viewYear--;} renderCalendar(); saveSession(); });
+    document.getElementById('next-month').addEventListener('click',()=>{ if(++viewMonth>11){viewMonth=0;viewYear++;} renderCalendar(); saveSession(); });
+    document.getElementById('s-subject').addEventListener('input',()=>{ regenerateA(); regenerateB(); regenerateC(); });
+    document.getElementById('s-duration').addEventListener('change', saveSession);
+    document.getElementById('t-header-a').addEventListener('input',()=>{ regenerateA(); saveTmplCurrent(); });
+    document.getElementById('t-footer-a').addEventListener('input',()=>{ regenerateA(); saveTmplCurrent(); });
+    document.getElementById('t-header-b').addEventListener('input',()=>{ regenerateB(); saveTmplCurrent(); });
+    document.getElementById('t-footer-b').addEventListener('input',()=>{ regenerateB(); saveTmplCurrent(); });
+    document.getElementById('t-header-c').addEventListener('input',()=>{ regenerateC(); saveTmplCurrent(); });
+    document.getElementById('t-footer-c').addEventListener('input',()=>{ regenerateC(); saveTmplCurrent(); });
+
+    setupPresets('a','t-header-a','t-footer-a',regenerateA);
+    setupPresets('b','t-header-b','t-footer-b',regenerateB);
+    setupPresets('c','t-header-c','t-footer-c',regenerateC);
+
+    // ── Startup ──────────────────────────────────────
+    loadTmplCurrent();
+    // デフォルトテンプレートを適用（選択が空なら）
+    ['a','b','c'].forEach(w=>{
+      const sel=document.getElementById('preset-sel-'+w);
+      if(sel.value===''){
+        const def=getDefault(w);
+        if(def){
+          const idx=getPresets(w).findIndex(p=>p.name===def);
+          if(idx>=0){
+            const p=getPresets(w)[idx];
+            setv('t-header-'+w, p.header); setv('t-footer-'+w, p.footer);
+            sel.value=idx;
+          }
+        }
+      }
+      updateSaveBtnState(w);
+    });
+    saveTmplCurrent();
+    // 旧バージョンからの移行（schedule_session → 履歴1件）
+    try {
+      const legacy = JSON.parse(localStorage.getItem('schedule_session')||'null');
+      if(legacy && legacy.selected && Object.keys(legacy.selected).length && !getHistories().length){
+        const id = newHistId();
+        setHistoriesArr([{ id, subject: legacy.subject||'MA', selected: legacy.selected, step: legacy.step||1, duration: legacy.duration||'60', vY: legacy.vY, vM: legacy.vM, updatedAt: Date.now() }]);
+        setActive(id);
+      }
+      localStorage.removeItem('schedule_session');
+    } catch(e){}
+
+    const savedActive = localStorage.getItem(ACTIVE_KEY);
+    const activeEntry = savedActive ? getHistories().find(h=>h.id===savedActive) : null;
+    if(activeEntry && Object.keys(activeEntry.selected||{}).length){
+      loadHistory(savedActive);
+      document.getElementById('restore-banner').style.display='flex';
+    } else {
+      renderCalendar(); renderDateList();
+    }
+    updateHistCount();
+  </script>
+</body>
+</html>
