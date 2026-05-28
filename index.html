@@ -456,21 +456,67 @@
     const DOW_JA = ['日','月','火','水','木','金','土'];
     const NUMS   = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩'];
 
-    const HOLIDAYS = {
-      '2025-01-01':'元旦','2025-01-13':'成人の日','2025-02-11':'建国記念の日',
-      '2025-02-23':'天皇誕生日','2025-02-24':'振替休日','2025-03-20':'春分の日',
-      '2025-04-29':'昭和の日','2025-05-03':'憲法記念日','2025-05-04':'みどりの日',
-      '2025-05-05':'こどもの日','2025-05-06':'振替休日','2025-07-21':'海の日',
-      '2025-08-11':'山の日','2025-09-15':'敬老の日','2025-09-23':'秋分の日',
-      '2025-10-13':'スポーツの日','2025-11-03':'文化の日','2025-11-23':'勤労感謝の日',
-      '2025-11-24':'振替休日',
-      '2026-01-01':'元旦','2026-01-12':'成人の日','2026-02-11':'建国記念の日',
-      '2026-02-23':'天皇誕生日','2026-03-20':'春分の日','2026-04-29':'昭和の日',
-      '2026-05-03':'憲法記念日','2026-05-04':'みどりの日','2026-05-05':'こどもの日',
-      '2026-05-06':'振替休日','2026-07-20':'海の日','2026-08-11':'山の日',
-      '2026-09-21':'敬老の日','2026-09-22':'国民の休日','2026-09-23':'秋分の日',
-      '2026-10-12':'スポーツの日','2026-11-03':'文化の日','2026-11-23':'勤労感謝の日',
-    };
+    // 日本の祝日を自動計算（2025〜2040年）
+    function _pad2(n){ return String(n).padStart(2,'0'); }
+    function _ymd(d){ return `${d.getFullYear()}-${_pad2(d.getMonth()+1)}-${_pad2(d.getDate())}`; }
+    function _nthDow(year, month, dow, n){ // month:1-12, dow:0=日, n:1=第1
+      const first = new Date(year, month-1, 1);
+      return 1 + ((dow - first.getDay() + 7) % 7) + (n-1)*7;
+    }
+    // 春分日（1980-2099）／秋分日（1980-2099）天文計算
+    function _springEquinox(y){ return Math.floor(20.8431 + 0.242194*(y-1980) - Math.floor((y-1980)/4)); }
+    function _autumnEquinox(y){ return Math.floor(23.2488 + 0.242194*(y-1980) - Math.floor((y-1980)/4)); }
+
+    function _yearHolidays(year){
+      const list = [
+        [1, 1, '元旦'],
+        [1, _nthDow(year,1,1,2), '成人の日'],
+        [2, 11, '建国記念の日'],
+        [2, 23, '天皇誕生日'],
+        [3, _springEquinox(year), '春分の日'],
+        [4, 29, '昭和の日'],
+        [5, 3, '憲法記念日'],
+        [5, 4, 'みどりの日'],
+        [5, 5, 'こどもの日'],
+        [7, _nthDow(year,7,1,3), '海の日'],
+        [8, 11, '山の日'],
+        [9, _nthDow(year,9,1,3), '敬老の日'],
+        [9, _autumnEquinox(year), '秋分の日'],
+        [10, _nthDow(year,10,1,2), 'スポーツの日'],
+        [11, 3, '文化の日'],
+        [11, 23, '勤労感謝の日'],
+      ];
+      const map = {};
+      list.forEach(([m,d,name])=>{ map[`${year}-${_pad2(m)}-${_pad2(d)}`] = name; });
+      // 振替休日：祝日が日曜の場合、次の祝日でない平日
+      Object.keys(map).slice().forEach(k=>{
+        const [y,m,d] = k.split('-').map(Number);
+        const dt = new Date(y, m-1, d);
+        if(dt.getDay()===0){
+          const nx = new Date(dt); nx.setDate(nx.getDate()+1);
+          while(map[_ymd(nx)]) nx.setDate(nx.getDate()+1);
+          map[_ymd(nx)] = '振替休日';
+        }
+      });
+      // 国民の休日：祝日に挟まれた平日（日曜以外）
+      Object.keys(map).slice().sort().forEach(k=>{
+        const [y,m,d] = k.split('-').map(Number);
+        const dt = new Date(y, m-1, d);
+        const after = new Date(dt); after.setDate(after.getDate()+2);
+        const between = new Date(dt); between.setDate(between.getDate()+1);
+        const bkey = _ymd(between);
+        if(map[_ymd(after)] && !map[bkey] && between.getDay()!==0){
+          map[bkey] = '国民の休日';
+        }
+      });
+      return map;
+    }
+
+    const HOLIDAYS = (function(){
+      const m = {};
+      for(let y=2025; y<=2040; y++) Object.assign(m, _yearHolidays(y));
+      return m;
+    })();
 
     const QUICK_PRESETS = [];
     for (let _h = 10; _h <= 19; _h++) QUICK_PRESETS.push({ label: `${_h}:00`, start: `${String(_h).padStart(2,'0')}:00` });
