@@ -840,36 +840,55 @@
       const hdr=document.getElementById('t-header-b').value, ftr=document.getElementById('t-footer-b').value;
       const out=document.getElementById('output-b');
 
-      // 候補日（STEP 2 で時間スロットを入力済みの日付のみ＝A社から空きが返ってきた日）
-      const keys=Object.keys(selected).sort().filter(k=>selected[k].length>0);
+      const allKeys = Object.keys(selected).sort();
+      if(!allKeys.length){ out.value=''; return; }
+
+      // STEP 2 で時間スロットを入力済みの日付があるか
+      const anySlot = allKeys.some(k => selected[k].some(s => s.start));
+      const keys = anySlot
+        ? allKeys.filter(k => selected[k].some(s => s.start))
+        : allKeys;
       if(!keys.length){ out.value=''; return; }
 
-      // 日付をインラインで連結（同月なら2つ目以降の月を省略）
-      const dateLabels=[]; let prevMonth=null;
-      keys.forEach(k=>{
-        const [y,m,d]=k.split('-').map(Number);
-        const dt=new Date(y,m-1,d);
-        if(prevMonth===m) dateLabels.push(`${d}日（${DOW_JA[dt.getDay()]}）`);
-        else dateLabels.push(`${m}月${d}日（${DOW_JA[dt.getDay()]}）`);
-        prevMonth=m;
-      });
-      const datesStr=dateLabels.join('と');
+      const dur = getDur();
+      const lines = [hdr.replace(/\{subject\}/g,subj), ''];
 
-      // 所要時間
-      const dur=getDur();
-      const durStr = dur>0 ? `${fmtDur(dur)}ほど` : '';
-
-      // 日付＋所要時間の文
-      let dateDurLine;
-      if(!durStr) dateDurLine = datesStr;
-      else if(keys.length>1) dateDurLine = `${datesStr}どこか${durStr}`;
-      else dateDurLine = `${datesStr}で${durStr}`;
+      if(anySlot){
+        // 番号付きリスト：各日付＋選択時間
+        keys.forEach((k, i)=>{
+          const slots = selected[k].filter(s => s.start);
+          const slotsStr = slots.map(s => s.end ? `${s.start} 〜 ${s.end}` : s.start).join('、');
+          const num = NUMS[i] || `${i+1}.`;
+          lines.push(`${num}  ${fmtDate(k)}  ${slotsStr}`);
+        });
+        // 「上記日程のどこか[所要時間]ほど」
+        if(dur > 0){
+          lines.push('', `上記日程のどこか${fmtDur(dur)}ほど`);
+        }
+      } else {
+        // 時間設定なし → 従来通り compact 表示
+        const dateLabels=[]; let prevMonth=null;
+        keys.forEach(k=>{
+          const [y,m,d]=k.split('-').map(Number);
+          const dt=new Date(y,m-1,d);
+          if(prevMonth===m) dateLabels.push(`${d}日（${DOW_JA[dt.getDay()]}）`);
+          else dateLabels.push(`${m}月${d}日（${DOW_JA[dt.getDay()]}）`);
+          prevMonth=m;
+        });
+        const datesStr = dateLabels.join('と');
+        const durStr = dur>0 ? `${fmtDur(dur)}ほど` : '';
+        let dateDurLine;
+        if(!durStr) dateDurLine = datesStr;
+        else if(keys.length>1) dateDurLine = `${datesStr}どこか${durStr}`;
+        else dateDurLine = `${datesStr}で${durStr}`;
+        lines.push(dateDurLine);
+      }
 
       // 内容文（STEP 1 と同じロジック）
       const withC = keys.filter(k => contents[k] && contents[k].trim());
-      let contentLine = '';
       if(withC.length){
         const allSame = withC.every(k => contents[k].trim() === contents[withC[0]].trim());
+        let contentLine;
         if(allSame){
           contentLine = `内容は「${contents[withC[0]].trim()}」です。`;
         } else {
@@ -883,11 +902,9 @@
             ? `内容は${head.join('で、')}で、${last}です。`
             : `内容は${last}です。`;
         }
+        lines.push('', contentLine);
       }
 
-      // 組み立て
-      const lines = [hdr.replace(/\{subject\}/g,subj), '', dateDurLine];
-      if(contentLine) lines.push('', contentLine);
       lines.push('', ftr);
       out.value = lines.join('\n');
     }
