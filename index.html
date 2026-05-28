@@ -826,18 +826,70 @@
       return row;
     }
 
-    // ── Generate B（日付 + 時間）──────────────────────
+    // 所要時間を「1時間30分」形式に整形
+    function fmtDur(min){
+      if(min<60) return `${min}分`;
+      const h=Math.floor(min/60), m=min%60;
+      return m===0 ? `${h}時間` : `${h}時間${m}分`;
+    }
+
+    // ── Generate B（日付＋所要時間 + 内容）──────────
     function regenerateB(){
       saveSession();
       const subj=document.getElementById('s-subject').value.trim()||'打ち合わせ';
       const hdr=document.getElementById('t-header-b').value, ftr=document.getElementById('t-footer-b').value;
       const out=document.getElementById('output-b');
-      const list=[];
-      Object.keys(selected).sort().forEach(k=>selected[k].forEach(s=>{ if(s.start)list.push({k,slot:s}); }));
-      if(!list.length){ out.value=''; return; }
-      const lines=[hdr.replace(/\{subject\}/g,subj),''];
-      list.forEach(({k,slot},i)=>{ const n=NUMS[i]||`${i+1}.`; let ln=`${n}  ${fmtDate(k)}  ${slot.start}`; if(slot.end)ln+=` 〜 ${slot.end}`; lines.push(ln); });
-      lines.push('',ftr); out.value=lines.join('\n');
+
+      // 候補日（STEP 2 で時間スロットを入力済みの日付のみ＝A社から空きが返ってきた日）
+      const keys=Object.keys(selected).sort().filter(k=>selected[k].length>0);
+      if(!keys.length){ out.value=''; return; }
+
+      // 日付をインラインで連結（同月なら2つ目以降の月を省略）
+      const dateLabels=[]; let prevMonth=null;
+      keys.forEach(k=>{
+        const [y,m,d]=k.split('-').map(Number);
+        const dt=new Date(y,m-1,d);
+        if(prevMonth===m) dateLabels.push(`${d}日（${DOW_JA[dt.getDay()]}）`);
+        else dateLabels.push(`${m}月${d}日（${DOW_JA[dt.getDay()]}）`);
+        prevMonth=m;
+      });
+      const datesStr=dateLabels.join('と');
+
+      // 所要時間
+      const dur=getDur();
+      const durStr = dur>0 ? `${fmtDur(dur)}ほど` : '';
+
+      // 日付＋所要時間の文
+      let dateDurLine;
+      if(!durStr) dateDurLine = datesStr;
+      else if(keys.length>1) dateDurLine = `${datesStr}どこか${durStr}`;
+      else dateDurLine = `${datesStr}で${durStr}`;
+
+      // 内容文（STEP 1 と同じロジック）
+      const withC = keys.filter(k => contents[k] && contents[k].trim());
+      let contentLine = '';
+      if(withC.length){
+        const allSame = withC.every(k => contents[k].trim() === contents[withC[0]].trim());
+        if(allSame){
+          contentLine = `内容は「${contents[withC[0]].trim()}」です。`;
+        } else {
+          const parts = withC.map(k => {
+            const [y,m,d] = k.split('-').map(Number);
+            return `${m}月${d}日が「${contents[k].trim()}」`;
+          });
+          const last = parts[parts.length-1];
+          const head = parts.slice(0,-1);
+          contentLine = head.length
+            ? `内容は${head.join('で、')}で、${last}です。`
+            : `内容は${last}です。`;
+        }
+      }
+
+      // 組み立て
+      const lines = [hdr.replace(/\{subject\}/g,subj), '', dateDurLine];
+      if(contentLine) lines.push('', contentLine);
+      lines.push('', ftr);
+      out.value = lines.join('\n');
     }
 
     // ── Step switching ───────────────────────────────
