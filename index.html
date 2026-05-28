@@ -845,21 +845,23 @@
 
       // STEP 2 で時間スロットを入力済みの日付があるか
       const anySlot = allKeys.some(k => selected[k].some(s => s.start));
-      const keys = anySlot
-        ? allKeys.filter(k => selected[k].some(s => s.start))
-        : allKeys;
+      const keys = allKeys; // 時間がない日付も含めて全候補日を表示
       if(!keys.length){ out.value=''; return; }
 
       const dur = getDur();
       const lines = [hdr.replace(/\{subject\}/g,subj), ''];
 
       if(anySlot){
-        // 番号付きリスト：各日付＋選択時間
+        // 番号付きリスト：各日付＋選択時間（時間なしの日は日付のみ）
         keys.forEach((k, i)=>{
           const slots = selected[k].filter(s => s.start);
-          const slotsStr = slots.map(s => s.end ? `${s.start} 〜 ${s.end}` : s.start).join('、');
           const num = NUMS[i] || `${i+1}.`;
-          lines.push(`${num}  ${fmtDate(k)}  ${slotsStr}`);
+          if(slots.length){
+            const slotsStr = slots.map(s => s.end ? `${s.start} 〜 ${s.end}` : s.start).join('、');
+            lines.push(`${num}  ${fmtDate(k)}  ${slotsStr}`);
+          } else {
+            lines.push(`${num}  ${fmtDate(k)}`);
+          }
         });
         // 「上記日程のどこか[所要時間]ほど」
         if(dur > 0){
