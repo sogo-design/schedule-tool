@@ -29,8 +29,7 @@
     .step-num { width: 20px; height: 20px; border-radius: 50%; background: var(--border); color: var(--text3); font-size: .68rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all .2s; }
     .step-item.active .step-num { background: var(--accent); color: #fff; }
     .step-item.done .step-num { background: var(--green); color: #fff; }
-    .step-lbl { font-size: .8rem; font-weight: 700; color: var(--text3); white-space: nowrap; }
-    .step-sub { font-size: .63rem; color: var(--text3); margin-top: 1px; }
+    .step-lbl { font-size: .85rem; font-weight: 700; color: var(--text3); white-space: nowrap; letter-spacing: .04em; }
     .step-item.active .step-lbl { color: var(--accent); }
     .step-item.done .step-lbl { color: var(--green); }
     .step-connector { height: 1px; width: 44px; background: var(--border); flex-shrink: 0; transition: background .3s; }
@@ -251,26 +250,17 @@
     <div class="step-bar">
       <div class="step-item active" id="si-1">
         <div class="step-num" id="sn-1">1</div>
-        <div>
-          <div class="step-lbl">A社へ送付</div>
-          <div class="step-sub">候補日を共有</div>
-        </div>
+        <div class="step-lbl">STEP 1</div>
       </div>
       <div class="step-connector" id="sc-1"></div>
       <div class="step-item" id="si-2">
         <div class="step-num">2</div>
-        <div>
-          <div class="step-lbl">B社へ送付</div>
-          <div class="step-sub">A社の空き時間で打診</div>
-        </div>
+        <div class="step-lbl">STEP 2</div>
       </div>
       <div class="step-connector" id="sc-2"></div>
       <div class="step-item" id="si-3">
         <div class="step-num">3</div>
-        <div>
-          <div class="step-lbl">A社へ確定連絡</div>
-          <div class="step-sub">決定日程を連絡</div>
-        </div>
+        <div class="step-lbl">STEP 3</div>
       </div>
     </div>
   </div>
@@ -362,7 +352,7 @@
     </div>
 
     <div class="step-nav right">
-      <button class="btn-next" id="to-step2">A社の返答を入力する &rarr;</button>
+      <button class="btn-next" id="to-step2">STEP 2 へ &rarr;</button>
     </div>
   </div>
 
@@ -413,8 +403,8 @@
     </div>
 
     <div class="step-nav" style="justify-content:space-between">
-      <button class="btn-back" id="to-step1">&larr; 候補日の編集に戻る</button>
-      <button class="btn-next" id="to-step3">B社からの返答を反映 &rarr;</button>
+      <button class="btn-back" id="to-step1">&larr; STEP 1 へ戻る</button>
+      <button class="btn-next" id="to-step3">STEP 3 へ &rarr;</button>
     </div>
   </div>
 
@@ -491,7 +481,7 @@
     </div>
 
     <div class="step-nav" style="justify-content:space-between">
-      <button class="btn-back" id="to-step2-back">&larr; 時間調整に戻る</button>
+      <button class="btn-back" id="to-step2-back">&larr; STEP 2 へ戻る</button>
       <button class="btn-finish" id="finish-btn">この日程調整を完了する</button>
     </div>
   </div>
