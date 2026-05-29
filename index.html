@@ -316,8 +316,14 @@
 
   <div class="content-bar">
     <label>MAルーム番号（任意）</label>
-    <input type="text" id="room-number" class="room-input" placeholder="例：405">
-    <span class="contact-hint">B社向け確定文面の <code>{room}</code> タグに挿入されます</span>
+    <select class="preset-sel" id="room-sel">
+      <option value="">― なし ―</option>
+    </select>
+    <button class="preset-btn add" id="room-add">+ 追加</button>
+    <button class="preset-btn" id="room-rename">改名</button>
+    <button class="preset-btn icon star" id="room-default" title="デフォルトに設定">☆</button>
+    <button class="preset-btn del" id="room-del">削除</button>
+    <span class="contact-hint">B社向け確定文面の <code>{room}</code> タグに挿入</span>
   </div>
 
   <!-- ══ STEP 1：A社へ（日程のみ）══ -->
@@ -490,18 +496,18 @@
               <button class="preset-btn del" id="preset-del-d">削除</button>
             </div>
             <div class="field">
-              <label>冒頭文</label>
-              <div class="tmpl-hint">置換タグ：<b>{date}</b>=日付　<b>{time}</b>=時間範囲　<b>{start}</b>=開始　<b>{end}</b>=終了　<b>{start+10}</b>=開始＋10分　<b>{start-15}</b>=開始−15分 など</div>
-              <textarea id="t-header-d" rows="8">いつもお世話になっております。
-ご確認誠にありがとうございました。
-
-それでは以下の時間でお願い出来ますでしょうか。
-
-{date}@EXタワープラスビル MA-{room} {time}
+              <label>冒頭文（先頭に1回だけ表示）</label>
+              <textarea id="t-header-d" rows="5">いつもお世話になっております。
+FOSKIA image 後藤です。</textarea>
+            </div>
+            <div class="field">
+              <label>本文（決定日程ごとに繰り返し表示）</label>
+              <div class="tmpl-hint">置換タグ：<b>{date}</b>=日付　<b>{time}</b>=時間範囲　<b>{start}</b>=開始　<b>{end}</b>=終了　<b>{start+10}</b>=開始＋10分　<b>{room}</b>=ルーム番号</div>
+              <textarea id="t-body-d" rows="3">{date}@EXタワープラスビル MA-{room} {time}
 ナレーター入り：{start+10}</textarea>
             </div>
             <div class="field">
-              <label>結び文</label>
+              <label>結び文（末尾に1回だけ表示）</label>
               <textarea id="t-footer-d" rows="2">お手数ですがご確認よろしくお願いいたします。</textarea>
             </div>
           </div>
@@ -1204,10 +1210,12 @@
       out.value = `${hdr.replace(/\{subject\}/g, subj)}\n\n${body}\n\n${ftr}`;
     }
 
-    // ── Generate D（B社向け確定文面、置換タグ対応）─
+    // ── Generate D（B社向け確定文面 / header(1回)+body(各日程)+footer(1回)）─
     function regenerateD(){
       saveSession();
-      const hdr = document.getElementById('t-header-d').value, ftr = document.getElementById('t-footer-d').value;
+      const hdr = document.getElementById('t-header-d').value;
+      const body = document.getElementById('t-body-d').value;
+      const ftr = document.getElementById('t-footer-d').value;
       const out = document.getElementById('output-d');
 
       const groups = getContentGroups();
@@ -1217,9 +1225,19 @@
         .map(ck => ({ ck, slot: finalSlots[ck] }));
       if(!filled.length){ out.value = ''; return; }
 
-      const usePlaceholders = hasPlaceholders(hdr) || hasPlaceholders(ftr);
-      if(usePlaceholders){
-        // 各 finalSlot ごとに header+footer を展開（複数の場合は連結）
+      if(body.trim()){
+        // 新形式：ヘッダー1回 + 本文（各 finalSlot ごとに展開） + フッター1回
+        const firstSlot = filled[0].slot;
+        const expandedHeader = hasPlaceholders(hdr) ? expandPlaceholders(hdr, firstSlot) : hdr;
+        const expandedFooter = hasPlaceholders(ftr) ? expandPlaceholders(ftr, firstSlot) : ftr;
+        const expandedBodies = filled.map(({ slot }) => expandPlaceholders(body, slot));
+        const parts = [];
+        if(expandedHeader) parts.push(expandedHeader);
+        if(expandedBodies.length) parts.push(expandedBodies.join('\n\n'));
+        if(expandedFooter) parts.push(expandedFooter);
+        out.value = parts.join('\n\n');
+      } else if(hasPlaceholders(hdr) || hasPlaceholders(ftr)){
+        // 旧形式：本文なしでヘッダーにタグ → 各 slot ごとに header+footer を繰り返し
         const blocks = filled.map(({ slot }) => {
           const h = expandPlaceholders(hdr, slot);
           const f = expandPlaceholders(ftr, slot);
@@ -1228,8 +1246,8 @@
         out.value = blocks.join('\n\n―――\n\n');
       } else {
         // タグなし → 従来形式：header + 自動body + footer
-        const body = buildConfirmedBody();
-        out.value = `${hdr}\n\n${body}\n\n${ftr}`;
+        const autoBody = buildConfirmedBody();
+        out.value = `${hdr}\n\n${autoBody}\n\n${ftr}`;
       }
     }
 
@@ -1311,7 +1329,11 @@
       contents = h.contents || {};
       contactName = h.contactName || '';
       roomNumber = h.roomNumber || '';
-      document.getElementById('room-number').value = roomNumber;
+      // 履歴に保存されたルーム番号がプリセットになければ追加
+      if(roomNumber && !getRoomPresets().includes(roomNumber)){
+        const arr = getRoomPresets(); arr.push(roomNumber); setRoomPresets(arr);
+      }
+      refreshRoomList();
       // 旧データ互換：finalSlot(単数) → finalSlots(マップ)
       if(h.finalSlots){
         finalSlots = h.finalSlots;
@@ -1494,6 +1516,89 @@
       });
     }
 
+    // ── MAルーム番号プリセット ───────────────────────
+    function getRoomPresets(){ try { return (JSON.parse(localStorage.getItem('room_presets'))||[]).sort((a,b)=>a.localeCompare(b,'ja')); } catch(e){ return []; } }
+    function setRoomPresets(arr){ try { localStorage.setItem('room_presets', JSON.stringify(arr)); } catch(e){} }
+    function getRoomDefault(){ return localStorage.getItem('room_default') || ''; }
+    function setRoomDefaultVal(val){ if(val) localStorage.setItem('room_default', val); else localStorage.removeItem('room_default'); }
+    function refreshRoomList(){
+      const sel = document.getElementById('room-sel');
+      const def = getRoomDefault();
+      sel.innerHTML = '<option value="">― なし ―</option>';
+      getRoomPresets().forEach(v => {
+        const o = document.createElement('option');
+        o.value = v; o.textContent = (v === def ? '★ ' : '') + v;
+        sel.appendChild(o);
+      });
+      sel.value = (roomNumber && getRoomPresets().includes(roomNumber)) ? roomNumber : '';
+      updateRoomBtnState();
+      updateRoomDefaultBtn();
+    }
+    function updateRoomBtnState(){
+      const sel = document.getElementById('room-sel');
+      const has = sel.value !== '';
+      document.getElementById('room-rename').disabled = !has;
+      document.getElementById('room-del').disabled = !has;
+    }
+    function updateRoomDefaultBtn(){
+      const sel = document.getElementById('room-sel');
+      const btn = document.getElementById('room-default');
+      const cur = sel.value;
+      if(!cur){ btn.disabled = true; btn.textContent = '☆'; btn.classList.remove('on'); btn.title = 'デフォルトに設定'; return; }
+      btn.disabled = false;
+      const isDef = cur === getRoomDefault();
+      btn.textContent = isDef ? '★' : '☆';
+      btn.classList.toggle('on', isDef);
+      btn.title = isDef ? 'デフォルトを解除' : 'デフォルトに設定';
+    }
+    function setupRoom(){
+      refreshRoomList();
+      document.getElementById('room-sel').addEventListener('change', e => {
+        roomNumber = e.target.value;
+        updateRoomBtnState(); updateRoomDefaultBtn();
+        regenerateD();
+      });
+      document.getElementById('room-add').addEventListener('click', () => {
+        const val = (prompt('ルーム番号を入力してください（例：405）')||'').trim();
+        if(!val) return;
+        const arr = getRoomPresets();
+        if(arr.includes(val)){ alert('同じ番号が既に保存されています'); roomNumber = val; refreshRoomList(); regenerateD(); return; }
+        arr.push(val); setRoomPresets(arr);
+        roomNumber = val; refreshRoomList(); regenerateD();
+      });
+      document.getElementById('room-rename').addEventListener('click', () => {
+        const cur = document.getElementById('room-sel').value;
+        if(!cur){ alert('改名するルーム番号を選択してください'); return; }
+        const newVal = (prompt('新しい番号を入力してください', cur)||'').trim();
+        if(!newVal || newVal === cur) return;
+        const arr = getRoomPresets();
+        if(arr.includes(newVal)){ alert('同じ番号が既に保存されています'); return; }
+        const idx = arr.indexOf(cur);
+        if(idx >= 0) arr[idx] = newVal;
+        setRoomPresets(arr);
+        if(roomNumber === cur) roomNumber = newVal;
+        if(getRoomDefault() === cur) setRoomDefaultVal(newVal);
+        refreshRoomList(); regenerateD();
+      });
+      document.getElementById('room-default').addEventListener('click', () => {
+        const cur = document.getElementById('room-sel').value;
+        if(!cur) return;
+        if(getRoomDefault() === cur) setRoomDefaultVal(null);
+        else setRoomDefaultVal(cur);
+        refreshRoomList();
+      });
+      document.getElementById('room-del').addEventListener('click', () => {
+        const cur = document.getElementById('room-sel').value;
+        if(!cur){ alert('削除するルーム番号を選択してください'); return; }
+        if(!confirm(`「${cur}」を削除しますか？`)) return;
+        const arr = getRoomPresets().filter(v => v !== cur);
+        setRoomPresets(arr);
+        if(roomNumber === cur) roomNumber = '';
+        if(getRoomDefault() === cur) setRoomDefaultVal(null);
+        refreshRoomList(); regenerateD();
+      });
+    }
+
     // ── 内容プリセット ───────────────────────────────
     function getContentPresets(){ try { return (JSON.parse(localStorage.getItem('content_presets'))||[]).sort((a,b)=>a.localeCompare(b,'ja')); } catch(e){ return []; } }
     function setContentPresetsList(arr){ try { localStorage.setItem('content_presets', JSON.stringify(arr)); } catch(e){} }
@@ -1596,7 +1701,7 @@
           ha: gv('t-header-a'), fa: gv('t-footer-a'),
           hb: gv('t-header-b'), fb: gv('t-footer-b'),
           hc: gv('t-header-c'), fc: gv('t-footer-c'),
-          hd: gv('t-header-d'), fd: gv('t-footer-d'),
+          hd: gv('t-header-d'), bd: gv('t-body-d'), fd: gv('t-footer-d'),
           selA: (selAVal!=='' && aArr[selAVal]) ? aArr[selAVal].name : null,
           selB: (selBVal!=='' && bArr[selBVal]) ? bArr[selBVal].name : null,
           selC: (selCVal!=='' && cArr[selCVal]) ? cArr[selCVal].name : null,
@@ -1607,21 +1712,38 @@
     function loadTmplCurrent(){
       let t; try { t = JSON.parse(localStorage.getItem('tmpl_current')); } catch(e){ return; }
       if(!t) return;
-      // 旧Dテンプレートのデフォルトはマイグレーション（HTML側の新デフォルトを使う）
-      const OLD_D_HEADER = "お世話になっております。\n日程につきまして、下記の通り決定いたしましたのでご連絡いたします。";
-      const OLD_D_FOOTER = "当日はどうぞよろしくお願いいたします。";
       if(t.ha!=null) setv('t-header-a',t.ha);
       if(t.fa!=null) setv('t-footer-a',t.fa);
       if(t.hb!=null) setv('t-header-b',t.hb);
       if(t.fb!=null) setv('t-footer-b',t.fb);
       if(t.hc!=null) setv('t-header-c',t.hc);
       if(t.fc!=null) setv('t-footer-c',t.fc);
-      if(t.hd!=null && t.hd !== OLD_D_HEADER) setv('t-header-d',t.hd);
-      if(t.fd!=null && t.fd !== OLD_D_FOOTER) setv('t-footer-d',t.fd);
+      if(t.hd!=null) setv('t-header-d',t.hd);
+      if(t.bd !== undefined) setv('t-body-d', t.bd);
+      else setv('t-body-d', ''); // 旧データ：bodyフィールド未保存 → 空にしてマイグレーションを促す
+      if(t.fd!=null) setv('t-footer-d',t.fd);
       if(t.selA){ const i=getPresets('a').findIndex(p=>p.name===t.selA); if(i>=0) document.getElementById('preset-sel-a').value=i; }
       if(t.selB){ const i=getPresets('b').findIndex(p=>p.name===t.selB); if(i>=0) document.getElementById('preset-sel-b').value=i; }
       if(t.selC){ const i=getPresets('c').findIndex(p=>p.name===t.selC); if(i>=0) document.getElementById('preset-sel-c').value=i; }
       if(t.selD){ const i=getPresets('d').findIndex(p=>p.name===t.selD); if(i>=0) document.getElementById('preset-sel-d').value=i; }
+    }
+
+    // Dテンプレートのヘッダーに置換タグが含まれていて本文が空の場合、自動でヘッダーから本文部分を分離
+    function autoMigrateDTemplate(){
+      const hdEl = document.getElementById('t-header-d');
+      const bodyEl = document.getElementById('t-body-d');
+      if(bodyEl.value.trim()) return; // 本文が既にある
+      if(!hasPlaceholders(hdEl.value)) return; // ヘッダーにタグがない
+      const lines = hdEl.value.split('\n');
+      let bodyStart = -1;
+      for(let i = 0; i < lines.length; i++){
+        if(hasPlaceholders(lines[i])){ bodyStart = i; break; }
+      }
+      if(bodyStart < 0) return;
+      const headerPart = lines.slice(0, bodyStart).join('\n').replace(/\n+$/, '');
+      const bodyPart = lines.slice(bodyStart).join('\n').trim();
+      hdEl.value = headerPart;
+      bodyEl.value = bodyPart;
     }
 
     // ── Template presets (named) ─────────────────────
@@ -1663,14 +1785,19 @@
       const rn=document.getElementById('preset-rename-'+w); if(rn) rn.disabled = !hasSel;
       updateDefaultBtn(w);
     }
-    function setupPresets(w, headerId, footerId, regen){
+    function setupPresets(w, fields, regen){
+      // fields: { header: 'id', body: 'id'?, footer: 'id' }
+      const fieldKeys = Object.keys(fields);
+      const applyTo = (p) => fieldKeys.forEach(k => setv(fields[k], p[k] !== undefined ? p[k] : ''));
+      const capture = () => { const o = {}; fieldKeys.forEach(k => o[k] = gv(fields[k])); return o; };
+
       refreshPresetList(w);
       updateSaveBtnState(w);
       document.getElementById('preset-sel-'+w).addEventListener('change', e=>{
         updateSaveBtnState(w);
         const i=e.target.value; if(i==='') { saveTmplCurrent(); return; }
         const p=getPresets(w)[i];
-        if(p){ setv(headerId,p.header); setv(footerId,p.footer); regen(); saveTmplCurrent(); }
+        if(p){ applyTo(p); regen(); saveTmplCurrent(); }
       });
       // + 新規追加
       document.getElementById('preset-add-'+w).addEventListener('click', ()=>{
@@ -1679,7 +1806,7 @@
         const arr=getPresets(w);
         let name=raw, n=2;
         while(arr.some(p=>p.name===name)) name = `${raw} (${n++})`;
-        arr.push({ name, header:gv(headerId), footer:gv(footerId) });
+        arr.push({ name, ...capture() });
         setPresets(w,arr); refreshPresetList(w);
         document.getElementById('preset-sel-'+w).value = getPresets(w).findIndex(p => p.name === name);
         updateSaveBtnState(w); saveTmplCurrent();
@@ -1691,7 +1818,7 @@
         const arr=getPresets(w);
         const target=arr[i]; if(!target){ alert('対象が見つかりません'); refreshPresetList(w); return; }
         if(!confirm(`「${target.name}」を現在の内容で上書きしますか？`)) return;
-        arr[i] = { name: target.name, header:gv(headerId), footer:gv(footerId) };
+        arr[i] = { name: target.name, ...capture() };
         setPresets(w,arr); refreshPresetList(w);
         sel.value = i; updateSaveBtnState(w);
       });
@@ -1745,9 +1872,9 @@
       contents = {};
       contactName = '';
       roomNumber = '';
-      document.getElementById('room-number').value = '';
       finalSlots = {};
       refreshContactList();
+      refreshRoomList();
       viewYear = today.getFullYear(); viewMonth = today.getMonth();
       setStepView(1);
       document.getElementById('restore-banner').style.display='none';
@@ -1783,10 +1910,6 @@
     document.getElementById('banner-close').addEventListener('click', ()=>{ document.getElementById('restore-banner').style.display='none'; });
     document.getElementById('prev-month').addEventListener('click',()=>{ if(--viewMonth<0){viewMonth=11;viewYear--;} renderCalendar(); saveSession(); });
     document.getElementById('next-month').addEventListener('click',()=>{ if(++viewMonth>11){viewMonth=0;viewYear++;} renderCalendar(); saveSession(); });
-    document.getElementById('room-number').addEventListener('input', ()=>{
-      roomNumber = document.getElementById('room-number').value;
-      regenerateD();
-    });
     document.getElementById('s-duration').addEventListener('change', ()=>{
       saveSession();
       // STEP 3 表示中なら、各 finalSlot の終了時刻を再計算
@@ -1805,18 +1928,26 @@
     document.getElementById('t-header-c').addEventListener('input',()=>{ regenerateC(); saveTmplCurrent(); });
     document.getElementById('t-footer-c').addEventListener('input',()=>{ regenerateC(); saveTmplCurrent(); });
     document.getElementById('t-header-d').addEventListener('input',()=>{ regenerateD(); saveTmplCurrent(); });
+    document.getElementById('t-body-d').addEventListener('input',()=>{ regenerateD(); saveTmplCurrent(); });
     document.getElementById('t-footer-d').addEventListener('input',()=>{ regenerateD(); saveTmplCurrent(); });
 
-    setupPresets('a','t-header-a','t-footer-a',regenerateA);
-    setupPresets('b','t-header-b','t-footer-b',regenerateB);
-    setupPresets('c','t-header-c','t-footer-c',regenerateC);
-    setupPresets('d','t-header-d','t-footer-d',regenerateD);
+    setupPresets('a', { header: 't-header-a', footer: 't-footer-a' }, regenerateA);
+    setupPresets('b', { header: 't-header-b', footer: 't-footer-b' }, regenerateB);
+    setupPresets('c', { header: 't-header-c', footer: 't-footer-c' }, regenerateC);
+    setupPresets('d', { header: 't-header-d', body: 't-body-d', footer: 't-footer-d' }, regenerateD);
     setupContact();
+    setupRoom();
     setupContentPresets();
 
     // ── Startup ──────────────────────────────────────
     loadTmplCurrent();
     // デフォルトテンプレートを適用（選択が空なら）
+    const PRESET_FIELDS = {
+      a: { header: 't-header-a', footer: 't-footer-a' },
+      b: { header: 't-header-b', footer: 't-footer-b' },
+      c: { header: 't-header-c', footer: 't-footer-c' },
+      d: { header: 't-header-d', body: 't-body-d', footer: 't-footer-d' },
+    };
     ['a','b','c','d'].forEach(w=>{
       const sel=document.getElementById('preset-sel-'+w);
       if(sel.value===''){
@@ -1825,19 +1956,29 @@
           const idx=getPresets(w).findIndex(p=>p.name===def);
           if(idx>=0){
             const p=getPresets(w)[idx];
-            setv('t-header-'+w, p.header); setv('t-footer-'+w, p.footer);
+            Object.entries(PRESET_FIELDS[w]).forEach(([k, id]) => setv(id, p[k] !== undefined ? p[k] : ''));
             sel.value=idx;
           }
         }
       }
       updateSaveBtnState(w);
     });
+    // Dテンプレートの旧形式（ヘッダーに本文混在）を本文へ自動分離
+    autoMigrateDTemplate();
     // 確認者のデフォルト適用（未選択ならデフォルトを使う）
     if(!contactName){
       const cDef = getContactDefault();
       if(cDef && getContactPresets().includes(cDef)){
         contactName = cDef;
         refreshContactList();
+      }
+    }
+    // ルーム番号のデフォルト適用
+    if(!roomNumber){
+      const rDef = getRoomDefault();
+      if(rDef && getRoomPresets().includes(rDef)){
+        roomNumber = rDef;
+        refreshRoomList();
       }
     }
     saveTmplCurrent();
