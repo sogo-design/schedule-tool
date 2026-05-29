@@ -502,9 +502,9 @@ FOSKIA image 後藤です。</textarea>
             </div>
             <div class="field">
               <label>本文（決定日程ごとに繰り返し表示）</label>
-              <div class="tmpl-hint">置換タグ：<b>{date}</b>=日付　<b>{time}</b>=時間範囲　<b>{start}</b>=開始　<b>{end}</b>=終了　<b>{start+10}</b>=開始＋10分　<b>{room}</b>=ルーム番号</div>
+              <div class="tmpl-hint">置換タグ：<b>{date}</b>=日付　<b>{time}</b>=時間　<b>{start+10}</b>=開始＋10分　<b>{room}</b>=ルーム番号　<b>{surname}</b>=確認者の苗字</div>
               <textarea id="t-body-d" rows="3">{date}@EXタワープラスビル MA-{room} {time}
-ナレーター入り：{start+10}</textarea>
+{surname}様入り：{start+10}</textarea>
             </div>
             <div class="field">
               <label>結び文（末尾に1回だけ表示）</label>
@@ -626,12 +626,15 @@ FOSKIA image 後藤です。</textarea>
         date = `${m}月${d}日(${DOW_JA[dt.getDay()]})`; // 半角カッコ
       }
       const timeRange = startTime + (endTime ? '〜' + endTime : '');
+      // 確認者の苗字（空白前の最初のパート）
+      const surname = contactName ? contactName.trim().split(/[\s　]+/)[0] : '';
       let out = text
         .replace(/\{date\}/g, date)
         .replace(/\{time\}/g, timeRange)
         .replace(/\{start\}/g, startTime)
         .replace(/\{end\}/g, endTime)
-        .replace(/\{room\}/g, roomNumber || '');
+        .replace(/\{room\}/g, roomNumber || '')
+        .replace(/\{surname\}/g, surname);
       out = out.replace(/\{(start|end)([+\-＋－])(\d+)\}/g, (m, base, sign, n) => {
         const baseTime = base === 'start' ? startTime : endTime;
         if(!baseTime) return '';
@@ -642,7 +645,7 @@ FOSKIA image 後藤です。</textarea>
       return out;
     }
     function hasPlaceholders(text){
-      return /\{(date|time|start|end|room)([+\-＋－]\d+)?\}/.test(text || '');
+      return /\{(date|time|start|end|room|surname)([+\-＋－]\d+)?\}/.test(text || '');
     }
     function getDur(){ return parseInt(document.getElementById('s-duration').value); }
 
@@ -1473,15 +1476,15 @@ FOSKIA image 後藤です。</textarea>
       document.getElementById('contact-sel').addEventListener('change', e => {
         contactName = e.target.value;
         updateContactBtnState(); updateContactDefaultBtn();
-        regenerateA();
+        regenerateA(); regenerateD();
       });
       document.getElementById('contact-add').addEventListener('click', () => {
         const name = (prompt('確認者名を入力してください（敬称なし。例：山田太郎）')||'').trim();
         if(!name) return;
         const arr = getContactPresets();
-        if(arr.includes(name)){ alert('同じ名前が既に保存されています'); contactName = name; refreshContactList(); regenerateA(); return; }
+        if(arr.includes(name)){ alert('同じ名前が既に保存されています'); contactName = name; refreshContactList(); regenerateA(); regenerateD(); return; }
         arr.push(name); setContactPresets(arr);
-        contactName = name; refreshContactList(); regenerateA();
+        contactName = name; refreshContactList(); regenerateA(); regenerateD();
       });
       document.getElementById('contact-rename').addEventListener('click', () => {
         const cur = document.getElementById('contact-sel').value;
@@ -1495,7 +1498,7 @@ FOSKIA image 後藤です。</textarea>
         setContactPresets(arr);
         if(contactName === cur) contactName = newName;
         if(getContactDefault() === cur) setContactDefault(newName);
-        refreshContactList(); regenerateA();
+        refreshContactList(); regenerateA(); regenerateD();
       });
       document.getElementById('contact-default').addEventListener('click', () => {
         const cur = document.getElementById('contact-sel').value;
@@ -1512,7 +1515,7 @@ FOSKIA image 後藤です。</textarea>
         setContactPresets(arr);
         if(contactName === cur) contactName = '';
         if(getContactDefault() === cur) setContactDefault(null);
-        refreshContactList(); regenerateA();
+        refreshContactList(); regenerateA(); regenerateD();
       });
     }
 
@@ -1726,6 +1729,15 @@ FOSKIA image 後藤です。</textarea>
       if(t.selB){ const i=getPresets('b').findIndex(p=>p.name===t.selB); if(i>=0) document.getElementById('preset-sel-b').value=i; }
       if(t.selC){ const i=getPresets('c').findIndex(p=>p.name===t.selC); if(i>=0) document.getElementById('preset-sel-c').value=i; }
       if(t.selD){ const i=getPresets('d').findIndex(p=>p.name===t.selD); if(i>=0) document.getElementById('preset-sel-d').value=i; }
+    }
+
+    // 「ナレーター」を {surname}様 に自動置換（一度きり）
+    function migrateNarratorToSurname(){
+      const bodyEl = document.getElementById('t-body-d');
+      if(!bodyEl) return;
+      if(bodyEl.value.includes('ナレーター')){
+        bodyEl.value = bodyEl.value.replace(/ナレーター/g, '{surname}様');
+      }
     }
 
     // Dテンプレートのヘッダーに置換タグが含まれていて本文が空の場合、自動でヘッダーから本文部分を分離
@@ -1965,6 +1977,8 @@ FOSKIA image 後藤です。</textarea>
     });
     // Dテンプレートの旧形式（ヘッダーに本文混在）を本文へ自動分離
     autoMigrateDTemplate();
+    // 「ナレーター」を {surname}様 に自動置換
+    migrateNarratorToSurname();
     // 確認者のデフォルト適用（未選択ならデフォルトを使う）
     if(!contactName){
       const cDef = getContactDefault();
