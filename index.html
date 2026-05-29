@@ -466,13 +466,19 @@
               <button class="preset-btn del" id="preset-del-c">削除</button>
             </div>
             <div class="field">
-              <label>冒頭文</label>
-              <textarea id="t-header-c" rows="4">お世話になっております。
-日程につきまして、下記の通り決定いたしましたのでご連絡いたします。</textarea>
+              <label>冒頭文（先頭に1回だけ表示）</label>
+              <textarea id="t-header-c" rows="5">いつもお世話になっております。
+FOSKIA image 後藤です。</textarea>
             </div>
             <div class="field">
-              <label>結び文</label>
-              <textarea id="t-footer-c" rows="2">当日はどうぞよろしくお願いいたします。</textarea>
+              <label>本文（決定日程ごとに繰り返し表示）</label>
+              <div class="tmpl-hint">置換タグ：<b>{date}</b>=日付　<b>{time}</b>=時間　<b>{start+10}</b>=開始＋10分　<b>{room}</b>=ルーム番号　<b>{surname}</b>=確認者の苗字</div>
+              <textarea id="t-body-c" rows="3">{date}@EXタワープラスビル MA-{room} {time}
+{surname}様入り：{start+10}</textarea>
+            </div>
+            <div class="field">
+              <label>結び文（末尾に1回だけ表示）</label>
+              <textarea id="t-footer-c" rows="2">お手数ですがご確認よろしくお願いいたします。</textarea>
             </div>
           </div>
         </div>
@@ -502,9 +508,9 @@ FOSKIA image 後藤です。</textarea>
             </div>
             <div class="field">
               <label>本文（決定日程ごとに繰り返し表示）</label>
-              <div class="tmpl-hint">置換タグ：<b>{date}</b>=日付　<b>{time}</b>=時間　<b>{start+10}</b>=開始＋10分　<b>{room}</b>=ルーム番号　<b>{surname}</b>=確認者の苗字</div>
+              <div class="tmpl-hint">置換タグ：<b>{date}</b>=日付　<b>{time}</b>=時間　<b>{start+10}</b>=開始＋10分　<b>{room}</b>=ルーム番号</div>
               <textarea id="t-body-d" rows="3">{date}@EXタワープラスビル MA-{room} {time}
-{surname}様入り：{start+10}</textarea>
+ナレーター入り：{start+10}</textarea>
             </div>
             <div class="field">
               <label>結び文（末尾に1回だけ表示）</label>
@@ -1202,15 +1208,42 @@ FOSKIA image 後藤です。</textarea>
       }).join('\n');
     }
 
-    // ── Generate C（A社向け確定文面）────────────────
+    // ── Generate C（A社向け確定文面 / header(1回)+body(各日程)+footer(1回)）─
     function regenerateC(){
       saveSession();
-      const subj = '';
-      const hdr = document.getElementById('t-header-c').value, ftr = document.getElementById('t-footer-c').value;
+      const hdr = document.getElementById('t-header-c').value;
+      const body = document.getElementById('t-body-c').value;
+      const ftr = document.getElementById('t-footer-c').value;
       const out = document.getElementById('output-c');
-      const body = buildConfirmedBody();
-      if(!body){ out.value = ''; return; }
-      out.value = `${hdr.replace(/\{subject\}/g, subj)}\n\n${body}\n\n${ftr}`;
+
+      const groups = getContentGroups();
+      const contentKeys = sortedContentKeys(groups);
+      const filled = contentKeys
+        .filter(ck => finalSlots[ck] && finalSlots[ck].start)
+        .map(ck => ({ ck, slot: finalSlots[ck] }));
+      if(!filled.length){ out.value = ''; return; }
+
+      if(body.trim()){
+        const firstSlot = filled[0].slot;
+        const expandedHeader = hasPlaceholders(hdr) ? expandPlaceholders(hdr, firstSlot) : hdr;
+        const expandedFooter = hasPlaceholders(ftr) ? expandPlaceholders(ftr, firstSlot) : ftr;
+        const expandedBodies = filled.map(({ slot }) => expandPlaceholders(body, slot));
+        const parts = [];
+        if(expandedHeader) parts.push(expandedHeader);
+        if(expandedBodies.length) parts.push(expandedBodies.join('\n\n'));
+        if(expandedFooter) parts.push(expandedFooter);
+        out.value = parts.join('\n\n');
+      } else if(hasPlaceholders(hdr) || hasPlaceholders(ftr)){
+        const blocks = filled.map(({ slot }) => {
+          const h = expandPlaceholders(hdr, slot);
+          const f = expandPlaceholders(ftr, slot);
+          return h && f ? `${h}\n\n${f}` : (h || f);
+        });
+        out.value = blocks.join('\n\n―――\n\n');
+      } else {
+        const autoBody = buildConfirmedBody();
+        out.value = `${hdr}\n\n${autoBody}\n\n${ftr}`;
+      }
     }
 
     // ── Generate D（B社向け確定文面 / header(1回)+body(各日程)+footer(1回)）─
@@ -1476,15 +1509,15 @@ FOSKIA image 後藤です。</textarea>
       document.getElementById('contact-sel').addEventListener('change', e => {
         contactName = e.target.value;
         updateContactBtnState(); updateContactDefaultBtn();
-        regenerateA(); regenerateD();
+        regenerateA(); regenerateC();
       });
       document.getElementById('contact-add').addEventListener('click', () => {
         const name = (prompt('確認者名を入力してください（敬称なし。例：山田太郎）')||'').trim();
         if(!name) return;
         const arr = getContactPresets();
-        if(arr.includes(name)){ alert('同じ名前が既に保存されています'); contactName = name; refreshContactList(); regenerateA(); regenerateD(); return; }
+        if(arr.includes(name)){ alert('同じ名前が既に保存されています'); contactName = name; refreshContactList(); regenerateA(); regenerateC(); return; }
         arr.push(name); setContactPresets(arr);
-        contactName = name; refreshContactList(); regenerateA(); regenerateD();
+        contactName = name; refreshContactList(); regenerateA(); regenerateC();
       });
       document.getElementById('contact-rename').addEventListener('click', () => {
         const cur = document.getElementById('contact-sel').value;
@@ -1498,7 +1531,7 @@ FOSKIA image 後藤です。</textarea>
         setContactPresets(arr);
         if(contactName === cur) contactName = newName;
         if(getContactDefault() === cur) setContactDefault(newName);
-        refreshContactList(); regenerateA(); regenerateD();
+        refreshContactList(); regenerateA(); regenerateC();
       });
       document.getElementById('contact-default').addEventListener('click', () => {
         const cur = document.getElementById('contact-sel').value;
@@ -1515,7 +1548,7 @@ FOSKIA image 後藤です。</textarea>
         setContactPresets(arr);
         if(contactName === cur) contactName = '';
         if(getContactDefault() === cur) setContactDefault(null);
-        refreshContactList(); regenerateA(); regenerateD();
+        refreshContactList(); regenerateA(); regenerateC();
       });
     }
 
@@ -1703,7 +1736,7 @@ FOSKIA image 後藤です。</textarea>
         localStorage.setItem('tmpl_current', JSON.stringify({
           ha: gv('t-header-a'), fa: gv('t-footer-a'),
           hb: gv('t-header-b'), fb: gv('t-footer-b'),
-          hc: gv('t-header-c'), fc: gv('t-footer-c'),
+          hc: gv('t-header-c'), bc: gv('t-body-c'), fc: gv('t-footer-c'),
           hd: gv('t-header-d'), bd: gv('t-body-d'), fd: gv('t-footer-d'),
           selA: (selAVal!=='' && aArr[selAVal]) ? aArr[selAVal].name : null,
           selB: (selBVal!=='' && bArr[selBVal]) ? bArr[selBVal].name : null,
@@ -1720,6 +1753,8 @@ FOSKIA image 後藤です。</textarea>
       if(t.hb!=null) setv('t-header-b',t.hb);
       if(t.fb!=null) setv('t-footer-b',t.fb);
       if(t.hc!=null) setv('t-header-c',t.hc);
+      if(t.bc !== undefined) setv('t-body-c', t.bc);
+      // bc未保存ならHTMLデフォルトのままにする（C用デフォルト）
       if(t.fc!=null) setv('t-footer-c',t.fc);
       if(t.hd!=null) setv('t-header-d',t.hd);
       if(t.bd !== undefined) setv('t-body-d', t.bd);
@@ -1731,12 +1766,19 @@ FOSKIA image 後藤です。</textarea>
       if(t.selD){ const i=getPresets('d').findIndex(p=>p.name===t.selD); if(i>=0) document.getElementById('preset-sel-d').value=i; }
     }
 
-    // 「ナレーター」を {surname}様 に自動置換（一度きり）
-    function migrateNarratorToSurname(){
-      const bodyEl = document.getElementById('t-body-d');
-      if(!bodyEl) return;
-      if(bodyEl.value.includes('ナレーター')){
-        bodyEl.value = bodyEl.value.replace(/ナレーター/g, '{surname}様');
+    // D body の {surname}様 を ナレーター に戻す（前回マイグレーションの取り消し）
+    // 併せて、C body が空なら D body の中身を C へ移動（surname入りの内容はA社向けへ）
+    function revertDBodySurname(){
+      const bodyDEl = document.getElementById('t-body-d');
+      const bodyCEl = document.getElementById('t-body-c');
+      if(!bodyDEl) return;
+      if(bodyDEl.value.includes('{surname}様')){
+        // C body が未設定なら、D body の中身（surname入り）を C へ移動
+        if(bodyCEl && !bodyCEl.value.trim()){
+          bodyCEl.value = bodyDEl.value;
+        }
+        // D body は ナレーター に戻す
+        bodyDEl.value = bodyDEl.value.replace(/\{surname\}様/g, 'ナレーター');
       }
     }
 
@@ -1938,6 +1980,7 @@ FOSKIA image 後藤です。</textarea>
     document.getElementById('t-header-b').addEventListener('input',()=>{ regenerateB(); saveTmplCurrent(); });
     document.getElementById('t-footer-b').addEventListener('input',()=>{ regenerateB(); saveTmplCurrent(); });
     document.getElementById('t-header-c').addEventListener('input',()=>{ regenerateC(); saveTmplCurrent(); });
+    document.getElementById('t-body-c').addEventListener('input',()=>{ regenerateC(); saveTmplCurrent(); });
     document.getElementById('t-footer-c').addEventListener('input',()=>{ regenerateC(); saveTmplCurrent(); });
     document.getElementById('t-header-d').addEventListener('input',()=>{ regenerateD(); saveTmplCurrent(); });
     document.getElementById('t-body-d').addEventListener('input',()=>{ regenerateD(); saveTmplCurrent(); });
@@ -1945,7 +1988,7 @@ FOSKIA image 後藤です。</textarea>
 
     setupPresets('a', { header: 't-header-a', footer: 't-footer-a' }, regenerateA);
     setupPresets('b', { header: 't-header-b', footer: 't-footer-b' }, regenerateB);
-    setupPresets('c', { header: 't-header-c', footer: 't-footer-c' }, regenerateC);
+    setupPresets('c', { header: 't-header-c', body: 't-body-c', footer: 't-footer-c' }, regenerateC);
     setupPresets('d', { header: 't-header-d', body: 't-body-d', footer: 't-footer-d' }, regenerateD);
     setupContact();
     setupRoom();
@@ -1957,7 +2000,7 @@ FOSKIA image 後藤です。</textarea>
     const PRESET_FIELDS = {
       a: { header: 't-header-a', footer: 't-footer-a' },
       b: { header: 't-header-b', footer: 't-footer-b' },
-      c: { header: 't-header-c', footer: 't-footer-c' },
+      c: { header: 't-header-c', body: 't-body-c', footer: 't-footer-c' },
       d: { header: 't-header-d', body: 't-body-d', footer: 't-footer-d' },
     };
     ['a','b','c','d'].forEach(w=>{
@@ -1977,8 +2020,8 @@ FOSKIA image 後藤です。</textarea>
     });
     // Dテンプレートの旧形式（ヘッダーに本文混在）を本文へ自動分離
     autoMigrateDTemplate();
-    // 「ナレーター」を {surname}様 に自動置換
-    migrateNarratorToSurname();
+    // 前回マイグレーション（ナレーター→{surname}様）を取り消し、surname入りはCへ移動
+    revertDBodySurname();
     // 確認者のデフォルト適用（未選択ならデフォルトを使う）
     if(!contactName){
       const cDef = getContactDefault();
