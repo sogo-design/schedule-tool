@@ -1348,7 +1348,7 @@
     }
 
     // ── 確認者プリセット ─────────────────────────────
-    function getContactPresets(){ try { return JSON.parse(localStorage.getItem('contact_presets'))||[]; } catch(e){ return []; } }
+    function getContactPresets(){ try { return (JSON.parse(localStorage.getItem('contact_presets'))||[]).sort((a,b)=>a.localeCompare(b,'ja')); } catch(e){ return []; } }
     function setContactPresets(arr){ try { localStorage.setItem('contact_presets', JSON.stringify(arr)); } catch(e){} }
     function getContactDefault(){ return localStorage.getItem('contact_default') || ''; }
     function setContactDefault(name){ if(name) localStorage.setItem('contact_default', name); else localStorage.removeItem('contact_default'); }
@@ -1433,7 +1433,7 @@
     }
 
     // ── 内容プリセット ───────────────────────────────
-    function getContentPresets(){ try { return JSON.parse(localStorage.getItem('content_presets'))||[]; } catch(e){ return []; } }
+    function getContentPresets(){ try { return (JSON.parse(localStorage.getItem('content_presets'))||[]).sort((a,b)=>a.localeCompare(b,'ja')); } catch(e){ return []; } }
     function setContentPresetsList(arr){ try { localStorage.setItem('content_presets', JSON.stringify(arr)); } catch(e){} }
     function getContentDefault(){ return localStorage.getItem('content_default') || ''; }
     function setContentDefaultVal(val){ if(val) localStorage.setItem('content_default', val); else localStorage.removeItem('content_default'); }
@@ -1560,7 +1560,7 @@
     }
 
     // ── Template presets (named) ─────────────────────
-    function getPresets(w){ try { return JSON.parse(localStorage.getItem('tmpl_presets_'+w))||[]; } catch(e){ return []; } }
+    function getPresets(w){ try { return (JSON.parse(localStorage.getItem('tmpl_presets_'+w))||[]).sort((a,b)=>a.name.localeCompare(b.name,'ja')); } catch(e){ return []; } }
     function setPresets(w,arr){ try { localStorage.setItem('tmpl_presets_'+w, JSON.stringify(arr)); } catch(e){} }
     function getDefault(w){ return localStorage.getItem('tmpl_default_'+w) || ''; }
     function setDefault(w,name){ if(name) localStorage.setItem('tmpl_default_'+w, name); else localStorage.removeItem('tmpl_default_'+w); }
@@ -1616,7 +1616,7 @@
         while(arr.some(p=>p.name===name)) name = `${raw} (${n++})`;
         arr.push({ name, header:gv(headerId), footer:gv(footerId) });
         setPresets(w,arr); refreshPresetList(w);
-        document.getElementById('preset-sel-'+w).value = arr.length-1;
+        document.getElementById('preset-sel-'+w).value = getPresets(w).findIndex(p => p.name === name);
         updateSaveBtnState(w); saveTmplCurrent();
       });
       // 上書き
@@ -1644,7 +1644,8 @@
         setPresets(w,arr);
         if(wasDefault) setDefault(w,newName);
         refreshPresetList(w);
-        sel.value = i; updateSaveBtnState(w); saveTmplCurrent();
+        sel.value = getPresets(w).findIndex(p => p.name === newName);
+        updateSaveBtnState(w); saveTmplCurrent();
       });
       // ☆ デフォルト
       document.getElementById('preset-default-'+w).addEventListener('click', ()=>{
