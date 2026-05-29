@@ -227,12 +227,15 @@
     .final-info { flex: 1; }
     .final-date { font-size: .9rem; font-weight: 700; }
     .final-time { font-size: .76rem; color: var(--text2); margin-top: 3px; }
-    .final-section { margin-bottom: 18px; }
+    .final-section { margin-bottom: 14px; }
     .final-section:last-child { margin-bottom: 0; }
     .final-section-label { font-size: .68rem; color: var(--text3); letter-spacing: .08em; font-weight: 700; margin-bottom: 8px; text-transform: uppercase; }
     .final-time-row { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: var(--surface2); border: 1px solid var(--accent); border-radius: 9px; flex-wrap: wrap; }
     .final-time-row .ts-btn { font-size: .95rem; padding: 7px 12px; min-width: 75px; }
     .dur-note { font-size: .68rem; color: var(--text3); margin-left: auto; }
+    .final-group { margin-bottom: 20px; padding-bottom: 18px; border-bottom: 1px dashed var(--border); }
+    .final-group:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+    .final-group-title { font-size: .82rem; font-weight: 700; color: var(--accent); margin-bottom: 12px; padding: 6px 12px; background: var(--accent-glow); border-radius: 6px; display: inline-block; }
   </style>
 </head>
 <body class="notranslate">
@@ -586,7 +589,7 @@
     let selected = {}; // { dateKey: [ {start,end}, ... ] }  STEP1は空配列、STEP2で時間を追加
     let contents = {}; // { dateKey: "内容" } — 各候補日の内容（任意）
     let contactName = ''; // 確認者の名前（任意）
-    let finalSlot = null; // { date, start, end } — STEP 3 で確定した日時
+    let finalSlots = {}; // { contentKey: { date, start, end } } — STEP 3 で内容ごとに確定した日時
 
     function dateKey(y,m,d){ return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
     function parseKey(k){ const [y,m,d]=k.split('-').map(Number); return {y,m:m-1,d}; }
@@ -972,114 +975,171 @@
     }
     function enterStep3(){
       if(!Object.keys(selected).length){ alert('候補日が設定されていません'); return; }
-      setStepView(3); validateFinalSlot(); renderFinalPicker(); regenerateC(); regenerateD(); saveSession();
+      setStepView(3); validateFinalSlots(); renderFinalPicker(); regenerateC(); regenerateD(); saveSession();
     }
     function exitStep3(){
       setStepView(2); renderTimeEditor(); regenerateB(); saveSession();
     }
 
-    function validateFinalSlot(){
-      if(!finalSlot) return;
-      if(!selected[finalSlot.date]) finalSlot = null;
+    // 内容ごとに候補日をグループ化
+    function getContentGroups(){
+      const groups = {};
+      Object.keys(selected).sort().forEach(k => {
+        const ck = (contents[k] && contents[k].trim()) || '';
+        if(!groups[ck]) groups[ck] = [];
+        groups[ck].push(k);
+      });
+      return groups;
+    }
+    function sortedContentKeys(groups){
+      return Object.keys(groups).sort((a,b) => {
+        if(a === '' && b !== '') return 1;
+        if(a !== '' && b === '') return -1;
+        return a.localeCompare(b);
+      });
+    }
+    // finalSlots を現在の selected/contents に整合させる
+    function validateFinalSlots(){
+      const newSlots = {};
+      Object.values(finalSlots).forEach(s => {
+        if(!s || !selected[s.date]) return;
+        const ck = (contents[s.date] && contents[s.date].trim()) || '';
+        if(!newSlots[ck]) newSlots[ck] = s;
+      });
+      finalSlots = newSlots;
     }
 
     function renderFinalPicker(){
-      const c=document.getElementById('final-picker');
-      c.innerHTML='';
-      const allDates = Object.keys(selected).sort();
-      if(!allDates.length){
-        c.innerHTML='<div class="slots-empty"><span>📅</span>確定する日付がありません</div>';
+      const c = document.getElementById('final-picker');
+      c.innerHTML = '';
+      const groups = getContentGroups();
+      const contentKeys = sortedContentKeys(groups);
+      if(!contentKeys.length){
+        c.innerHTML = '<div class="slots-empty"><span>📅</span>確定する日付がありません</div>';
         return;
       }
+      const showTitles = contentKeys.length > 1;
 
-      // 日付セクション
-      const dateSection = document.createElement('div'); dateSection.className='final-section';
-      const dateLabel = document.createElement('div'); dateLabel.className='final-section-label'; dateLabel.textContent='日付';
-      dateSection.appendChild(dateLabel);
+      contentKeys.forEach(ck => {
+        const dates = groups[ck];
+        const groupDiv = document.createElement('div');
+        groupDiv.className = 'final-group';
 
-      allDates.forEach(k=>{
-        const isSel = finalSlot && finalSlot.date===k;
-        const item=document.createElement('div'); item.className='final-item'+(isSel?' selected':'');
-        const radio=document.createElement('div'); radio.className='final-radio';
-        const info=document.createElement('div'); info.className='final-info';
-        const dd=document.createElement('div'); dd.className='final-date'; dd.textContent=fmtDate(k);
-        const ws=document.createElement('div'); ws.className='final-time';
-        const slots = selected[k].filter(s=>s.start);
-        if(slots.length){
-          const windows = slots.map(s => s.end ? `${s.start} 〜 ${s.end}` : s.start).join('、');
-          ws.textContent = `A社空き: ${windows}`;
-        } else {
-          ws.textContent = 'A社空き: 指定なし';
+        if(showTitles){
+          const title = document.createElement('div');
+          title.className = 'final-group-title';
+          title.textContent = ck ? `「${ck}」` : '（内容指定なし）';
+          groupDiv.appendChild(title);
         }
-        info.append(dd,ws); item.append(radio,info);
-        item.addEventListener('click',()=>{
-          const firstSlot = selected[k].find(s=>s.start);
-          const startTime = firstSlot ? firstSlot.start : '10:00';
-          const dur = getDur();
-          const endTime = dur>0 ? addMin(startTime,dur) : (firstSlot && firstSlot.end ? firstSlot.end : '');
-          finalSlot = { date:k, start:startTime, end:endTime };
-          renderFinalPicker(); regenerateC(); regenerateD();
-        });
-        dateSection.appendChild(item);
-      });
-      c.appendChild(dateSection);
 
-      // 時間セクション（日付選択済の場合）
-      if(finalSlot && finalSlot.date && selected[finalSlot.date]){
-        const timeSection = document.createElement('div'); timeSection.className='final-section';
-        const timeLabel = document.createElement('div'); timeLabel.className='final-section-label'; timeLabel.textContent='時間（確定）';
-        timeSection.appendChild(timeLabel);
+        const slot = finalSlots[ck]; // {date,start,end} or undefined
 
-        const timeRow = document.createElement('div'); timeRow.className='final-time-row';
-        const sSel = makeTimeSel(finalSlot.start || '10:00');
-        const eSel = makeTimeSel(finalSlot.end || '11:00');
-        sSel.addChangeListener(()=>{
-          finalSlot.start = sSel.getValue();
-          const dur = getDur();
-          if(dur>0){
-            finalSlot.end = addMin(finalSlot.start, dur);
-            eSel.setValue(finalSlot.end);
+        // 日付セクション
+        const dateSection = document.createElement('div'); dateSection.className = 'final-section';
+        const dateLabel = document.createElement('div'); dateLabel.className = 'final-section-label'; dateLabel.textContent = '日付';
+        dateSection.appendChild(dateLabel);
+
+        dates.forEach(k => {
+          const isSel = slot && slot.date === k;
+          const item = document.createElement('div'); item.className = 'final-item' + (isSel ? ' selected' : '');
+          const radio = document.createElement('div'); radio.className = 'final-radio';
+          const info = document.createElement('div'); info.className = 'final-info';
+          const dd = document.createElement('div'); dd.className = 'final-date'; dd.textContent = fmtDate(k);
+          const ws = document.createElement('div'); ws.className = 'final-time';
+          const slots = selected[k].filter(s => s.start);
+          if(slots.length){
+            const windows = slots.map(s => s.end ? `${s.start} 〜 ${s.end}` : s.start).join('、');
+            ws.textContent = `A社空き: ${windows}`;
+          } else {
+            ws.textContent = 'A社空き: 指定なし';
           }
-          regenerateC(); regenerateD();
+          info.append(dd, ws); item.append(radio, info);
+          item.addEventListener('click', () => {
+            const firstSlot = selected[k].find(s => s.start);
+            const startTime = firstSlot ? firstSlot.start : '10:00';
+            const dur = getDur();
+            const endTime = dur > 0 ? addMin(startTime, dur) : (firstSlot && firstSlot.end ? firstSlot.end : '');
+            finalSlots[ck] = { date: k, start: startTime, end: endTime };
+            renderFinalPicker(); regenerateC(); regenerateD();
+          });
+          dateSection.appendChild(item);
         });
-        eSel.addChangeListener(()=>{
-          finalSlot.end = eSel.getValue();
-          regenerateC(); regenerateD();
-        });
-        const sep=document.createElement('span'); sep.className='slot-sep'; sep.textContent='〜';
-        timeRow.append(sSel, sep, eSel);
-        const dur = getDur();
-        if(dur>0){
-          const note = document.createElement('span'); note.className='dur-note'; note.textContent=`所要時間: ${fmtDur(dur)}`;
-          timeRow.appendChild(note);
+        groupDiv.appendChild(dateSection);
+
+        // 時間セクション（日付選択済の場合）
+        if(slot && slot.date && selected[slot.date]){
+          const timeSection = document.createElement('div'); timeSection.className = 'final-section';
+          const timeLabel = document.createElement('div'); timeLabel.className = 'final-section-label'; timeLabel.textContent = '時間（確定）';
+          timeSection.appendChild(timeLabel);
+
+          const timeRow = document.createElement('div'); timeRow.className = 'final-time-row';
+          const sSel = makeTimeSel(slot.start || '10:00');
+          const eSel = makeTimeSel(slot.end || '11:00');
+          sSel.addChangeListener(() => {
+            slot.start = sSel.getValue();
+            const dur = getDur();
+            if(dur > 0){ slot.end = addMin(slot.start, dur); eSel.setValue(slot.end); }
+            regenerateC(); regenerateD();
+          });
+          eSel.addChangeListener(() => {
+            slot.end = eSel.getValue();
+            regenerateC(); regenerateD();
+          });
+          const sep = document.createElement('span'); sep.className = 'slot-sep'; sep.textContent = '〜';
+          timeRow.append(sSel, sep, eSel);
+          const dur = getDur();
+          if(dur > 0){
+            const note = document.createElement('span'); note.className = 'dur-note';
+            note.textContent = `所要時間: ${fmtDur(dur)}`;
+            timeRow.appendChild(note);
+          }
+          timeSection.appendChild(timeRow);
+          groupDiv.appendChild(timeSection);
         }
-        timeSection.appendChild(timeRow);
-        c.appendChild(timeSection);
+
+        c.appendChild(groupDiv);
+      });
+    }
+
+    // 確定文面を生成（A社・B社共通ロジック）
+    function buildConfirmedBody(){
+      const groups = getContentGroups();
+      const contentKeys = sortedContentKeys(groups);
+      const filled = contentKeys
+        .filter(ck => finalSlots[ck] && finalSlots[ck].start)
+        .map(ck => ({ ck, slot: finalSlots[ck] }));
+      if(!filled.length) return '';
+      if(filled.length === 1){
+        const { slot } = filled[0];
+        return `${fmtDate(slot.date)}  ${slot.start}${slot.end ? ' 〜 ' + slot.end : ''}`;
       }
+      return filled.map((f, i) => {
+        const num = NUMS[i] || `${i+1}.`;
+        const dtStr = `${fmtDate(f.slot.date)}  ${f.slot.start}${f.slot.end ? ' 〜 ' + f.slot.end : ''}`;
+        return f.ck ? `${num}  ${dtStr}  「${f.ck}」` : `${num}  ${dtStr}`;
+      }).join('\n');
     }
 
     // ── Generate C（A社向け確定文面）────────────────
     function regenerateC(){
       saveSession();
-      const subj=document.getElementById('s-subject').value.trim()||'打ち合わせ';
-      const hdr=document.getElementById('t-header-c').value, ftr=document.getElementById('t-footer-c').value;
-      const out=document.getElementById('output-c');
-      if(!finalSlot || !finalSlot.start){ out.value=''; return; }
-      const dtStr = `${fmtDate(finalSlot.date)}  ${finalSlot.start}${finalSlot.end?' 〜 '+finalSlot.end:''}`;
-      const headerOut = hdr.replace(/\{subject\}/g,subj);
-      out.value = `${headerOut}\n\n${dtStr}\n\n${ftr}`;
+      const subj = document.getElementById('s-subject').value.trim() || '打ち合わせ';
+      const hdr = document.getElementById('t-header-c').value, ftr = document.getElementById('t-footer-c').value;
+      const out = document.getElementById('output-c');
+      const body = buildConfirmedBody();
+      if(!body){ out.value = ''; return; }
+      out.value = `${hdr.replace(/\{subject\}/g, subj)}\n\n${body}\n\n${ftr}`;
     }
 
     // ── Generate D（B社向け確定文面）────────────────
     function regenerateD(){
       saveSession();
-      const subj=document.getElementById('s-subject').value.trim()||'打ち合わせ';
-      const hdr=document.getElementById('t-header-d').value, ftr=document.getElementById('t-footer-d').value;
-      const out=document.getElementById('output-d');
-      if(!finalSlot || !finalSlot.start){ out.value=''; return; }
-      const dtStr = `${fmtDate(finalSlot.date)}  ${finalSlot.start}${finalSlot.end?' 〜 '+finalSlot.end:''}`;
-      const headerOut = hdr.replace(/\{subject\}/g,subj);
-      out.value = `${headerOut}\n\n${dtStr}\n\n${ftr}`;
+      const subj = document.getElementById('s-subject').value.trim() || '打ち合わせ';
+      const hdr = document.getElementById('t-header-d').value, ftr = document.getElementById('t-footer-d').value;
+      const out = document.getElementById('output-d');
+      const body = buildConfirmedBody();
+      if(!body){ out.value = ''; return; }
+      out.value = `${hdr.replace(/\{subject\}/g, subj)}\n\n${body}\n\n${ftr}`;
     }
 
     // ── Copy ──────────────────────────────────────────
@@ -1118,7 +1178,7 @@
     function newHistId(){ return 'h' + Date.now().toString(36) + Math.floor(Math.random()*1000).toString(36); }
 
     function saveSession(){
-      validateFinalSlot();
+      validateFinalSlots();
       const arr = getHistories();
       if(!Object.keys(selected).length){
         if(activeHistoryId){
@@ -1139,7 +1199,7 @@
         selected,
         contents,
         contactName,
-        finalSlot,
+        finalSlots,
         step,
         duration: gv('s-duration'),
         vY: viewYear, vM: viewMonth,
@@ -1159,7 +1219,15 @@
       selected = h.selected || {};
       contents = h.contents || {};
       contactName = h.contactName || '';
-      finalSlot = h.finalSlot || null;
+      // 旧データ互換：finalSlot(単数) → finalSlots(マップ)
+      if(h.finalSlots){
+        finalSlots = h.finalSlots;
+      } else if(h.finalSlot){
+        const ck = (contents[h.finalSlot.date] && contents[h.finalSlot.date].trim()) || '';
+        finalSlots = { [ck]: h.finalSlot };
+      } else {
+        finalSlots = {};
+      }
       refreshContactList();
       setv('s-subject', h.subject ?? 'MA');
       setv('s-duration', h.duration ?? '60');
@@ -1170,7 +1238,7 @@
       document.getElementById('output-d').value = '';
       setStepView(1);
       renderCalendar(); renderDateList(); regenerateA();
-      if(h.step===3){ setStepView(3); renderTimeEditor(); regenerateB(); validateFinalSlot(); renderFinalPicker(); regenerateC(); regenerateD(); }
+      if(h.step===3){ setStepView(3); renderTimeEditor(); regenerateB(); validateFinalSlots(); renderFinalPicker(); regenerateC(); regenerateD(); }
       else if(h.step===2){ setStepView(2); renderTimeEditor(); regenerateB(); }
       updateHistCount();
       return true;
@@ -1481,7 +1549,7 @@
       selected = {};
       contents = {};
       contactName = '';
-      finalSlot = null;
+      finalSlots = {};
       refreshContactList();
       setv('s-subject','MA');
       viewYear = today.getFullYear(); viewMonth = today.getMonth();
@@ -1522,10 +1590,13 @@
     document.getElementById('s-subject').addEventListener('input',()=>{ regenerateA(); regenerateB(); regenerateC(); regenerateD(); });
     document.getElementById('s-duration').addEventListener('change', ()=>{
       saveSession();
-      // STEP 3 で時間ピッカーが開いている場合は終了時刻を再計算
-      if(finalSlot && finalSlot.start && document.getElementById('step3').style.display==='block'){
+      // STEP 3 表示中なら、各 finalSlot の終了時刻を再計算
+      if(document.getElementById('step3').style.display==='block'){
         const dur=getDur();
-        if(dur>0){ finalSlot.end = addMin(finalSlot.start, dur); renderFinalPicker(); regenerateC(); regenerateD(); }
+        if(dur>0){
+          Object.values(finalSlots).forEach(s => { if(s && s.start) s.end = addMin(s.start, dur); });
+          renderFinalPicker(); regenerateC(); regenerateD();
+        }
       }
     });
     document.getElementById('t-header-a').addEventListener('input',()=>{ regenerateA(); saveTmplCurrent(); });
