@@ -45,10 +45,10 @@
     .field-subject { flex: 1; min-width: 180px; }
     .field-dur-note { font-size: .62rem; color: var(--text3); margin-top: 3px; }
 
-    /* ── Contact bar ── */
-    .contact-bar { max-width: 840px; margin: 0 auto 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .contact-bar > label { font-size: .68rem; color: var(--text3); letter-spacing: .08em; font-weight: 600; white-space: nowrap; margin-right: 2px; }
-    .contact-bar > .preset-sel { min-width: 160px; flex: 0 1 200px; height: 36px; padding: 0 11px; font-size: .82rem; }
+    /* ── Contact / Content bars ── */
+    .contact-bar, .content-bar { max-width: 840px; margin: 0 auto 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .contact-bar > label, .content-bar > label { font-size: .68rem; color: var(--text3); letter-spacing: .08em; font-weight: 600; white-space: nowrap; margin-right: 2px; }
+    .contact-bar > .preset-sel, .content-bar > .preset-sel { min-width: 160px; flex: 0 1 200px; height: 36px; padding: 0 11px; font-size: .82rem; }
     .contact-hint { font-size: .65rem; color: var(--text3); margin-left: auto; }
 
     /* ── Layout ── */
@@ -297,6 +297,20 @@
     <button class="preset-btn del" id="contact-del">削除</button>
     <span class="contact-hint">A社向け文面に「【○○さま】の…」が挿入されます</span>
   </div>
+
+  <div class="content-bar">
+    <label>内容プリセット（任意）</label>
+    <select class="preset-sel" id="content-preset-sel">
+      <option value="">― 管理する内容を選択 ―</option>
+    </select>
+    <button class="preset-btn add" id="content-add">+ 追加</button>
+    <button class="preset-btn" id="content-rename">改名</button>
+    <button class="preset-btn icon star" id="content-default" title="デフォルトに設定">☆</button>
+    <button class="preset-btn del" id="content-del">削除</button>
+    <span class="contact-hint">候補日の「内容」入力に候補表示／デフォルトは新規日付に自動入力</span>
+  </div>
+
+  <datalist id="content-options"></datalist>
 
   <!-- ══ STEP 1：A社へ（日程のみ）══ -->
   <div id="step1">
@@ -670,7 +684,16 @@
         grid.appendChild(el);
       }
     }
-    function toggleDate(k){ if(selected[k]){delete selected[k]; delete contents[k];} else selected[k]=[]; renderCalendar();renderDateList();regenerateA(); }
+    function toggleDate(k){
+      if(selected[k]){ delete selected[k]; delete contents[k]; }
+      else {
+        selected[k]=[];
+        // デフォルト内容があれば自動セット
+        const def = (typeof getContentDefault === 'function') ? getContentDefault() : '';
+        if(def) contents[k] = def;
+      }
+      renderCalendar();renderDateList();regenerateA();
+    }
 
     // ── STEP 1: 候補日リスト（日付＋オプションで時間）─
     function renderDateList(){
@@ -690,6 +713,7 @@
       const lbl=document.createElement('span'); lbl.className='date-label'; lbl.textContent=fmtDate(k);
       if(HOLIDAYS[k]){ const hn=document.createElement('span'); hn.className='holiday-name'; hn.textContent=HOLIDAYS[k]; lbl.appendChild(hn); }
       const cIn=document.createElement('input'); cIn.type='text'; cIn.className='date-content-input'; cIn.placeholder='内容（任意）';
+      cIn.setAttribute('list','content-options');
       cIn.value = contents[k] || '';
       cIn.addEventListener('input',()=>{ contents[k]=cIn.value; regenerateA(); });
       left.append(lbl, cIn);
@@ -715,6 +739,7 @@
       const lbl=document.createElement('span'); lbl.className='date-label'; lbl.textContent=fmtDate(k);
       if(HOLIDAYS[k]){ const hn=document.createElement('span'); hn.className='holiday-name'; hn.textContent=HOLIDAYS[k]; lbl.appendChild(hn); }
       const cIn=document.createElement('input'); cIn.type='text'; cIn.className='date-content-input'; cIn.placeholder='内容（任意）';
+      cIn.setAttribute('list','content-options');
       cIn.value = contents[k] || '';
       cIn.addEventListener('input',()=>{ contents[k]=cIn.value; regenerateA(); });
       left.append(lbl, cIn);
@@ -1407,6 +1432,96 @@
       });
     }
 
+    // ── 内容プリセット ───────────────────────────────
+    function getContentPresets(){ try { return JSON.parse(localStorage.getItem('content_presets'))||[]; } catch(e){ return []; } }
+    function setContentPresetsList(arr){ try { localStorage.setItem('content_presets', JSON.stringify(arr)); } catch(e){} }
+    function getContentDefault(){ return localStorage.getItem('content_default') || ''; }
+    function setContentDefaultVal(val){ if(val) localStorage.setItem('content_default', val); else localStorage.removeItem('content_default'); }
+
+    function refreshContentDatalist(){
+      const list = document.getElementById('content-options');
+      list.innerHTML = '';
+      getContentPresets().forEach(v => {
+        const o = document.createElement('option'); o.value = v; list.appendChild(o);
+      });
+    }
+    function refreshContentSelect(){
+      const sel = document.getElementById('content-preset-sel');
+      const def = getContentDefault();
+      sel.innerHTML = '<option value="">― 管理する内容を選択 ―</option>';
+      getContentPresets().forEach(v => {
+        const o = document.createElement('option'); o.value = v;
+        o.textContent = (v === def ? '★ ' : '') + v;
+        sel.appendChild(o);
+      });
+      updateContentBtnState(); updateContentDefaultBtn();
+    }
+    function updateContentBtnState(){
+      const sel = document.getElementById('content-preset-sel');
+      const has = sel.value !== '';
+      document.getElementById('content-rename').disabled = !has;
+      document.getElementById('content-del').disabled = !has;
+    }
+    function updateContentDefaultBtn(){
+      const sel = document.getElementById('content-preset-sel');
+      const btn = document.getElementById('content-default');
+      const cur = sel.value;
+      if(!cur){ btn.disabled = true; btn.textContent = '☆'; btn.classList.remove('on'); btn.title = 'デフォルトに設定'; return; }
+      btn.disabled = false;
+      const isDef = cur === getContentDefault();
+      btn.textContent = isDef ? '★' : '☆';
+      btn.classList.toggle('on', isDef);
+      btn.title = isDef ? 'デフォルトを解除' : 'デフォルトに設定';
+    }
+    function setupContentPresets(){
+      refreshContentSelect();
+      refreshContentDatalist();
+
+      document.getElementById('content-preset-sel').addEventListener('change', () => {
+        updateContentBtnState(); updateContentDefaultBtn();
+      });
+      document.getElementById('content-add').addEventListener('click', () => {
+        const val = (prompt('内容を入力してください（例：WRC、スーパーフォーミュラ）')||'').trim();
+        if(!val) return;
+        const arr = getContentPresets();
+        if(arr.includes(val)){ alert('同じ内容が既に保存されています'); document.getElementById('content-preset-sel').value = val; updateContentBtnState(); updateContentDefaultBtn(); return; }
+        arr.push(val); setContentPresetsList(arr);
+        refreshContentSelect(); refreshContentDatalist();
+        document.getElementById('content-preset-sel').value = val;
+        updateContentBtnState(); updateContentDefaultBtn();
+      });
+      document.getElementById('content-rename').addEventListener('click', () => {
+        const sel = document.getElementById('content-preset-sel');
+        const cur = sel.value;
+        if(!cur){ alert('改名する内容を選択してください'); return; }
+        const newVal = (prompt('新しい内容を入力してください', cur)||'').trim();
+        if(!newVal || newVal === cur) return;
+        const arr = getContentPresets();
+        if(arr.includes(newVal)){ alert('同じ内容が既に保存されています'); return; }
+        const idx = arr.indexOf(cur);
+        if(idx >= 0) arr[idx] = newVal;
+        setContentPresetsList(arr);
+        if(getContentDefault() === cur) setContentDefaultVal(newVal);
+        refreshContentSelect(); refreshContentDatalist();
+      });
+      document.getElementById('content-default').addEventListener('click', () => {
+        const cur = document.getElementById('content-preset-sel').value;
+        if(!cur) return;
+        if(getContentDefault() === cur) setContentDefaultVal(null);
+        else setContentDefaultVal(cur);
+        refreshContentSelect();
+      });
+      document.getElementById('content-del').addEventListener('click', () => {
+        const cur = document.getElementById('content-preset-sel').value;
+        if(!cur){ alert('削除する内容を選択してください'); return; }
+        if(!confirm(`「${cur}」を削除しますか？`)) return;
+        const arr = getContentPresets().filter(v => v !== cur);
+        setContentPresetsList(arr);
+        if(getContentDefault() === cur) setContentDefaultVal(null);
+        refreshContentSelect(); refreshContentDatalist();
+      });
+    }
+
     // ── Template current (always persisted) ──────────
     function saveTmplCurrent(){
       try {
@@ -1625,6 +1740,7 @@
     setupPresets('c','t-header-c','t-footer-c',regenerateC);
     setupPresets('d','t-header-d','t-footer-d',regenerateD);
     setupContact();
+    setupContentPresets();
 
     // ── Startup ──────────────────────────────────────
     loadTmplCurrent();
