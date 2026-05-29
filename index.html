@@ -281,10 +281,6 @@
   </div>
 
   <div class="settings">
-    <div class="field field-subject">
-      <label>件名 / 用件</label>
-      <input type="text" id="s-subject" value="MA" placeholder="例: MA、打ち合わせ">
-    </div>
     <div class="field">
       <label>所要時間</label>
       <select id="s-duration">
@@ -351,9 +347,8 @@
             </div>
             <div class="field">
               <label>冒頭文</label>
-              <div class="tmpl-hint">{subject} で件名を展開</div>
               <textarea id="t-header-a" rows="4">お世話になっております。
-{subject}の日程についてお伺いしたくご連絡いたします。
+日程についてお伺いしたくご連絡いたします。
 
 下記の候補日の中から、ご都合のよい日と当日空いているお時間帯をお知らせください。</textarea>
             </div>
@@ -402,9 +397,8 @@
             </div>
             <div class="field">
               <label>冒頭文</label>
-              <div class="tmpl-hint">{subject} で件名を展開</div>
               <textarea id="t-header-b" rows="4">お世話になっております。
-{subject}の日程についてご連絡いたします。
+日程についてご連絡いたします。
 
 以下の日程でいかがでしょうか。</textarea>
             </div>
@@ -454,9 +448,8 @@
             </div>
             <div class="field">
               <label>冒頭文</label>
-              <div class="tmpl-hint">{subject} で件名を展開</div>
               <textarea id="t-header-c" rows="4">お世話になっております。
-{subject}の日程につきまして、下記の通り決定いたしましたのでご連絡いたします。</textarea>
+日程につきまして、下記の通り決定いたしましたのでご連絡いたします。</textarea>
             </div>
             <div class="field">
               <label>結び文</label>
@@ -485,9 +478,8 @@
             </div>
             <div class="field">
               <label>冒頭文</label>
-              <div class="tmpl-hint">{subject} で件名を展開</div>
               <textarea id="t-header-d" rows="4">お世話になっております。
-{subject}の日程につきまして、下記の通り決定いたしましたのでご連絡いたします。</textarea>
+日程につきまして、下記の通り決定いたしましたのでご連絡いたします。</textarea>
             </div>
             <div class="field">
               <label>結び文</label>
@@ -766,7 +758,7 @@
     // ── Generate A（日付＋指定があれば時間も）─────────
     function regenerateA(){
       saveSession();
-      const subj=document.getElementById('s-subject').value.trim()||'打ち合わせ';
+      const subj='';
       const hdr=document.getElementById('t-header-a').value, ftr=document.getElementById('t-footer-a').value;
       const keys=Object.keys(selected).sort(), out=document.getElementById('output-a');
       if(!keys.length){ out.value=''; return; }
@@ -876,7 +868,7 @@
     // ── Generate B（日付＋所要時間 + 内容）──────────
     function regenerateB(){
       saveSession();
-      const subj=document.getElementById('s-subject').value.trim()||'打ち合わせ';
+      const subj='';
       const hdr=document.getElementById('t-header-b').value, ftr=document.getElementById('t-footer-b').value;
       const out=document.getElementById('output-b');
 
@@ -1123,7 +1115,7 @@
     // ── Generate C（A社向け確定文面）────────────────
     function regenerateC(){
       saveSession();
-      const subj = document.getElementById('s-subject').value.trim() || '打ち合わせ';
+      const subj = '';
       const hdr = document.getElementById('t-header-c').value, ftr = document.getElementById('t-footer-c').value;
       const out = document.getElementById('output-c');
       const body = buildConfirmedBody();
@@ -1134,7 +1126,7 @@
     // ── Generate D（B社向け確定文面）────────────────
     function regenerateD(){
       saveSession();
-      const subj = document.getElementById('s-subject').value.trim() || '打ち合わせ';
+      const subj = '';
       const hdr = document.getElementById('t-header-d').value, ftr = document.getElementById('t-footer-d').value;
       const out = document.getElementById('output-d');
       const body = buildConfirmedBody();
@@ -1195,7 +1187,6 @@
       else if(document.getElementById('step2').style.display==='block') step = 2;
       const entry = {
         id: activeHistoryId,
-        subject: gv('s-subject'),
         selected,
         contents,
         contactName,
@@ -1229,7 +1220,6 @@
         finalSlots = {};
       }
       refreshContactList();
-      setv('s-subject', h.subject ?? 'MA');
       setv('s-duration', h.duration ?? '60');
       viewYear  = h.vY ?? today.getFullYear();
       viewMonth = h.vM ?? today.getMonth();
@@ -1258,6 +1248,14 @@
       return `${m}/${day} ${hh}:${mm}`;
     }
 
+    function getHistoryDisplayName(h){
+      const allContents = Object.values(h.contents || {}).filter(c => c && c.trim()).map(c => c.trim());
+      const unique = [...new Set(allContents)];
+      if(unique.length) return unique.join('、');
+      if(h.contactName) return h.contactName + ' さま';
+      if(h.subject) return h.subject; // 旧データ互換
+      return '(無題)';
+    }
     function renderHistoryList(){
       const list = document.getElementById('hist-list');
       const arr = getHistories().slice().sort((a,b)=>b.updatedAt-a.updatedAt);
@@ -1268,9 +1266,10 @@
         item.className = 'hist-item' + (h.id===activeHistoryId ? ' active':'');
         const dates = Object.keys(h.selected||{}).length;
         const stepCls = h.step===3 ? 's3' : (h.step===2 ? 's2' : '');
+        const title = getHistoryDisplayName(h);
         item.innerHTML = `
           <div class="hist-info">
-            <div class="hist-title">${escapeHtml(h.subject || '(無題)')}</div>
+            <div class="hist-title">${escapeHtml(title)}</div>
             <div class="hist-meta"><span class="hist-step ${stepCls}">STEP ${h.step||1}</span>候補日 ${dates}件 · ${fmtUpdated(h.updatedAt)} 更新</div>
           </div>
           <button class="hist-del" title="この履歴を削除">✕</button>
@@ -1282,11 +1281,11 @@
         });
         item.querySelector('.hist-del').addEventListener('click', e=>{
           e.stopPropagation();
-          if(!confirm(`「${h.subject || '(無題)'}」の履歴を削除しますか？`)) return;
+          if(!confirm(`「${title}」の履歴を削除しますか？`)) return;
           deleteHistory(h.id);
           // 削除したのがアクティブなら画面状態もリセット
           if(!getHistories().find(x=>x.id===activeHistoryId)){
-            selected = {}; setv('s-subject','MA');
+            selected = {};
             viewYear = today.getFullYear(); viewMonth = today.getMonth();
             setStepView(1); document.getElementById('output-b').value='';
             renderCalendar(); renderDateList(); regenerateA();
@@ -1551,7 +1550,6 @@
       contactName = '';
       finalSlots = {};
       refreshContactList();
-      setv('s-subject','MA');
       viewYear = today.getFullYear(); viewMonth = today.getMonth();
       setStepView(1);
       document.getElementById('restore-banner').style.display='none';
@@ -1587,7 +1585,6 @@
     document.getElementById('banner-close').addEventListener('click', ()=>{ document.getElementById('restore-banner').style.display='none'; });
     document.getElementById('prev-month').addEventListener('click',()=>{ if(--viewMonth<0){viewMonth=11;viewYear--;} renderCalendar(); saveSession(); });
     document.getElementById('next-month').addEventListener('click',()=>{ if(++viewMonth>11){viewMonth=0;viewYear++;} renderCalendar(); saveSession(); });
-    document.getElementById('s-subject').addEventListener('input',()=>{ regenerateA(); regenerateB(); regenerateC(); regenerateD(); });
     document.getElementById('s-duration').addEventListener('change', ()=>{
       saveSession();
       // STEP 3 表示中なら、各 finalSlot の終了時刻を再計算
