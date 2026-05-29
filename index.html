@@ -483,12 +483,18 @@
             </div>
             <div class="field">
               <label>冒頭文</label>
-              <textarea id="t-header-d" rows="4">お世話になっております。
-日程につきまして、下記の通り決定いたしましたのでご連絡いたします。</textarea>
+              <div class="tmpl-hint">置換タグ：<b>{date}</b>=日付　<b>{time}</b>=時間範囲　<b>{start}</b>=開始　<b>{end}</b>=終了　<b>{start+10}</b>=開始＋10分　<b>{start-15}</b>=開始−15分 など</div>
+              <textarea id="t-header-d" rows="8">いつもお世話になっております。
+ご確認誠にありがとうございました。
+
+それでは以下の時間でお願い出来ますでしょうか。
+
+{date}@EXタワープラスビル MA-405 {time}
+ナレーター入り：{start+10}</textarea>
             </div>
             <div class="field">
               <label>結び文</label>
-              <textarea id="t-footer-d" rows="2">当日はどうぞよろしくお願いいたします。</textarea>
+              <textarea id="t-footer-d" rows="2">お手数ですがご確認よろしくお願いいたします。</textarea>
             </div>
           </div>
         </div>
@@ -591,7 +597,36 @@
     function dateKey(y,m,d){ return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
     function parseKey(k){ const [y,m,d]=k.split('-').map(Number); return {y,m:m-1,d}; }
     function fmtDate(k){ const {y,m,d}=parseKey(k); return `${m+1}月${d}日（${DOW_JA[new Date(y,m,d).getDay()]}）`; }
-    function addMin(t,n){ const [h,mi]=t.split(':').map(Number),s=h*60+mi+n; return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; }
+    function addMin(t,n){ const [h,mi]=t.split(':').map(Number); let s=h*60+mi+n; s=((s%1440)+1440)%1440; return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; }
+
+    // テンプレート置換タグ展開: {date}{time}{start}{end}{start+N}{start-N}{end+N}{end-N}
+    function expandPlaceholders(text, slot){
+      const safe = slot || {};
+      const startTime = safe.start || '';
+      const endTime = safe.end || '';
+      let date = '';
+      if(safe.date){
+        const [y,m,d] = safe.date.split('-').map(Number);
+        const dt = new Date(y,m-1,d);
+        date = `${m}月${d}日(${DOW_JA[dt.getDay()]})`; // 半角カッコ
+      }
+      const timeRange = startTime + (endTime ? '〜' + endTime : '');
+      let out = text
+        .replace(/\{date\}/g, date)
+        .replace(/\{time\}/g, timeRange)
+        .replace(/\{start\}/g, startTime)
+        .replace(/\{end\}/g, endTime);
+      out = out.replace(/\{(start|end)([+\-－])(\d+)\}/g, (m, base, sign, n) => {
+        const baseTime = base === 'start' ? startTime : endTime;
+        if(!baseTime) return '';
+        const off = parseInt(n) * (sign === '+' ? 1 : -1);
+        return addMin(baseTime, off);
+      });
+      return out;
+    }
+    function hasPlaceholders(text){
+      return /\{(date|time|start|end)([+\-－]\d+)?\}/.test(text || '');
+    }
     function getDur(){ return parseInt(document.getElementById('s-duration').value); }
 
     // ── TimeSel ──────────────────────────────────────
@@ -1158,15 +1193,33 @@
       out.value = `${hdr.replace(/\{subject\}/g, subj)}\n\n${body}\n\n${ftr}`;
     }
 
-    // ── Generate D（B社向け確定文面）────────────────
+    // ── Generate D（B社向け確定文面、置換タグ対応）─
     function regenerateD(){
       saveSession();
-      const subj = '';
       const hdr = document.getElementById('t-header-d').value, ftr = document.getElementById('t-footer-d').value;
       const out = document.getElementById('output-d');
-      const body = buildConfirmedBody();
-      if(!body){ out.value = ''; return; }
-      out.value = `${hdr.replace(/\{subject\}/g, subj)}\n\n${body}\n\n${ftr}`;
+
+      const groups = getContentGroups();
+      const contentKeys = sortedContentKeys(groups);
+      const filled = contentKeys
+        .filter(ck => finalSlots[ck] && finalSlots[ck].start)
+        .map(ck => ({ ck, slot: finalSlots[ck] }));
+      if(!filled.length){ out.value = ''; return; }
+
+      const usePlaceholders = hasPlaceholders(hdr) || hasPlaceholders(ftr);
+      if(usePlaceholders){
+        // 各 finalSlot ごとに header+footer を展開（複数の場合は連結）
+        const blocks = filled.map(({ slot }) => {
+          const h = expandPlaceholders(hdr, slot);
+          const f = expandPlaceholders(ftr, slot);
+          return h && f ? `${h}\n\n${f}` : (h || f);
+        });
+        out.value = blocks.join('\n\n―――\n\n');
+      } else {
+        // タグなし → 従来形式：header + 自動body + footer
+        const body = buildConfirmedBody();
+        out.value = `${hdr}\n\n${body}\n\n${ftr}`;
+      }
     }
 
     // ── Copy ──────────────────────────────────────────
