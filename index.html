@@ -307,7 +307,7 @@
     <button class="preset-btn" id="content-rename">改名</button>
     <button class="preset-btn icon star" id="content-default" title="デフォルトに設定">☆</button>
     <button class="preset-btn del" id="content-del">削除</button>
-    <span class="contact-hint">候補日の「内容」入力に候補表示／デフォルトは新規日付に自動入力</span>
+    <span class="contact-hint">候補日の「内容」入力欄に候補（保存値）として表示されます</span>
   </div>
 
   <datalist id="content-options"></datalist>
@@ -686,12 +686,7 @@
     }
     function toggleDate(k){
       if(selected[k]){ delete selected[k]; delete contents[k]; }
-      else {
-        selected[k]=[];
-        // デフォルト内容があれば自動セット
-        const def = (typeof getContentDefault === 'function') ? getContentDefault() : '';
-        if(def) contents[k] = def;
-      }
+      else selected[k] = [];
       renderCalendar();renderDateList();regenerateA();
     }
 
