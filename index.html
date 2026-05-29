@@ -50,6 +50,8 @@
     .contact-bar > label, .content-bar > label { font-size: .68rem; color: var(--text3); letter-spacing: .08em; font-weight: 600; white-space: nowrap; margin-right: 2px; }
     .contact-bar > .preset-sel, .content-bar > .preset-sel { min-width: 160px; flex: 0 1 200px; height: 36px; padding: 0 11px; font-size: .82rem; }
     .contact-hint { font-size: .65rem; color: var(--text3); margin-left: auto; }
+    .room-input { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: .82rem; padding: 0 11px; height: 36px; width: 110px; font-family: inherit; outline: none; transition: border-color .15s; }
+    .room-input:focus { border-color: var(--accent); }
 
     /* ── Layout ── */
     .layout { max-width: 840px; margin: 0 auto; display: grid; grid-template-columns: 292px 1fr; gap: 12px; align-items: start; }
@@ -312,6 +314,12 @@
 
   <datalist id="content-options"></datalist>
 
+  <div class="content-bar">
+    <label>MAルーム番号（任意）</label>
+    <input type="text" id="room-number" class="room-input" placeholder="例：405">
+    <span class="contact-hint">B社向け確定文面の <code>{room}</code> タグに挿入されます</span>
+  </div>
+
   <!-- ══ STEP 1：A社へ（日程のみ）══ -->
   <div id="step1">
     <div class="layout">
@@ -489,7 +497,7 @@
 
 それでは以下の時間でお願い出来ますでしょうか。
 
-{date}@EXタワープラスビル MA-405 {time}
+{date}@EXタワープラスビル MA-{room} {time}
 ナレーター入り：{start+10}</textarea>
             </div>
             <div class="field">
@@ -592,6 +600,7 @@
     let selected = {}; // { dateKey: [ {start,end}, ... ] }  STEP1は空配列、STEP2で時間を追加
     let contents = {}; // { dateKey: "内容" } — 各候補日の内容（任意）
     let contactName = ''; // 確認者の名前（任意）
+    let roomNumber = ''; // MAルーム番号（任意）— {room} に展開
     let finalSlots = {}; // { contentKey: { date, start, end } } — STEP 3 で内容ごとに確定した日時
 
     function dateKey(y,m,d){ return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
@@ -615,17 +624,19 @@
         .replace(/\{date\}/g, date)
         .replace(/\{time\}/g, timeRange)
         .replace(/\{start\}/g, startTime)
-        .replace(/\{end\}/g, endTime);
-      out = out.replace(/\{(start|end)([+\-－])(\d+)\}/g, (m, base, sign, n) => {
+        .replace(/\{end\}/g, endTime)
+        .replace(/\{room\}/g, roomNumber || '');
+      out = out.replace(/\{(start|end)([+\-＋－])(\d+)\}/g, (m, base, sign, n) => {
         const baseTime = base === 'start' ? startTime : endTime;
         if(!baseTime) return '';
-        const off = parseInt(n) * (sign === '+' ? 1 : -1);
+        const isPositive = sign === '+' || sign === '＋';
+        const off = parseInt(n) * (isPositive ? 1 : -1);
         return addMin(baseTime, off);
       });
       return out;
     }
     function hasPlaceholders(text){
-      return /\{(date|time|start|end)([+\-－]\d+)?\}/.test(text || '');
+      return /\{(date|time|start|end|room)([+\-＋－]\d+)?\}/.test(text || '');
     }
     function getDur(){ return parseInt(document.getElementById('s-duration').value); }
 
@@ -1278,6 +1289,7 @@
         selected,
         contents,
         contactName,
+        roomNumber,
         finalSlots,
         step,
         duration: gv('s-duration'),
@@ -1298,6 +1310,8 @@
       selected = h.selected || {};
       contents = h.contents || {};
       contactName = h.contactName || '';
+      roomNumber = h.roomNumber || '';
+      document.getElementById('room-number').value = roomNumber;
       // 旧データ互換：finalSlot(単数) → finalSlots(マップ)
       if(h.finalSlots){
         finalSlots = h.finalSlots;
@@ -1593,14 +1607,17 @@
     function loadTmplCurrent(){
       let t; try { t = JSON.parse(localStorage.getItem('tmpl_current')); } catch(e){ return; }
       if(!t) return;
+      // 旧Dテンプレートのデフォルトはマイグレーション（HTML側の新デフォルトを使う）
+      const OLD_D_HEADER = "お世話になっております。\n日程につきまして、下記の通り決定いたしましたのでご連絡いたします。";
+      const OLD_D_FOOTER = "当日はどうぞよろしくお願いいたします。";
       if(t.ha!=null) setv('t-header-a',t.ha);
       if(t.fa!=null) setv('t-footer-a',t.fa);
       if(t.hb!=null) setv('t-header-b',t.hb);
       if(t.fb!=null) setv('t-footer-b',t.fb);
       if(t.hc!=null) setv('t-header-c',t.hc);
       if(t.fc!=null) setv('t-footer-c',t.fc);
-      if(t.hd!=null) setv('t-header-d',t.hd);
-      if(t.fd!=null) setv('t-footer-d',t.fd);
+      if(t.hd!=null && t.hd !== OLD_D_HEADER) setv('t-header-d',t.hd);
+      if(t.fd!=null && t.fd !== OLD_D_FOOTER) setv('t-footer-d',t.fd);
       if(t.selA){ const i=getPresets('a').findIndex(p=>p.name===t.selA); if(i>=0) document.getElementById('preset-sel-a').value=i; }
       if(t.selB){ const i=getPresets('b').findIndex(p=>p.name===t.selB); if(i>=0) document.getElementById('preset-sel-b').value=i; }
       if(t.selC){ const i=getPresets('c').findIndex(p=>p.name===t.selC); if(i>=0) document.getElementById('preset-sel-c').value=i; }
@@ -1727,6 +1744,8 @@
       selected = {};
       contents = {};
       contactName = '';
+      roomNumber = '';
+      document.getElementById('room-number').value = '';
       finalSlots = {};
       refreshContactList();
       viewYear = today.getFullYear(); viewMonth = today.getMonth();
@@ -1764,6 +1783,10 @@
     document.getElementById('banner-close').addEventListener('click', ()=>{ document.getElementById('restore-banner').style.display='none'; });
     document.getElementById('prev-month').addEventListener('click',()=>{ if(--viewMonth<0){viewMonth=11;viewYear--;} renderCalendar(); saveSession(); });
     document.getElementById('next-month').addEventListener('click',()=>{ if(++viewMonth>11){viewMonth=0;viewYear++;} renderCalendar(); saveSession(); });
+    document.getElementById('room-number').addEventListener('input', ()=>{
+      roomNumber = document.getElementById('room-number').value;
+      regenerateD();
+    });
     document.getElementById('s-duration').addEventListener('change', ()=>{
       saveSession();
       // STEP 3 表示中なら、各 finalSlot の終了時刻を再計算
