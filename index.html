@@ -118,6 +118,7 @@
     .ts-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: .84rem; font-family: inherit; padding: 5px 10px; cursor: pointer; min-width: 60px; text-align: center; transition: border-color .12s; line-height: 1.4; display: block; }
     .ts-btn:hover { border-color: var(--border2); }
     .ts-btn.active { border-color: var(--accent); color: var(--accent); }
+    .ts-btn.empty { color: var(--text3); border-style: dashed; }
     .ts-picker { position: absolute; top: calc(100% + 4px); left: 0; display: flex; background: var(--surface); border: 1px solid var(--border2); border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,.5); z-index: 300; overflow: hidden; }
     .ts-h-list { overflow-y: auto; max-height: 180px; scrollbar-width: thin; scrollbar-color: var(--border2) transparent; min-width: 52px; }
     .ts-h-list::-webkit-scrollbar { width: 4px; }
@@ -581,15 +582,17 @@
 
     // ── TimeSel ──────────────────────────────────────
     function makeTimeSel(timeStr) {
-      let [h,m] = timeStr ? timeStr.split(':').map(Number) : [10,0];
+      let h = 10, m = 0, isSet = false;
+      if(timeStr && timeStr.includes(':')){ [h, m] = timeStr.split(':').map(Number); isSet = true; }
       const listeners = []; const fire = () => listeners.forEach(fn=>fn());
       const root = document.createElement('div'); root.className='ts-root';
       const btn  = document.createElement('button'); btn.type='button'; btn.className='ts-btn';
 
       function refreshDisplay(){
-        btn.textContent=`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
-        root.querySelectorAll('.ts-h-opt').forEach(el=>el.classList.toggle('sel',+el.dataset.v===h));
-        root.querySelectorAll('.ts-m-opt').forEach(el=>el.classList.toggle('sel',+el.dataset.v===m));
+        btn.textContent = isSet ? `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}` : '--:--';
+        btn.classList.toggle('empty', !isSet);
+        root.querySelectorAll('.ts-h-opt').forEach(el=>el.classList.toggle('sel', isSet && +el.dataset.v===h));
+        root.querySelectorAll('.ts-m-opt').forEach(el=>el.classList.toggle('sel', isSet && +el.dataset.v===m));
       }
 
       const picker=document.createElement('div'); picker.className='ts-picker'; picker.style.display='none';
@@ -597,14 +600,14 @@
       for(let i=0;i<=23;i++){
         const o=document.createElement('button'); o.type='button'; o.className='ts-h-opt'; o.dataset.v=i;
         o.textContent=String(i).padStart(2,'0');
-        o.addEventListener('mousedown',e=>{e.preventDefault();h=i;refreshDisplay();fire();});
+        o.addEventListener('mousedown',e=>{e.preventDefault();h=i;isSet=true;refreshDisplay();fire();});
         hList.appendChild(o);
       }
       const mList=document.createElement('div'); mList.className='ts-m-list';
       [0,15,30,45].forEach(mi=>{
         const o=document.createElement('button'); o.type='button'; o.className='ts-m-opt'; o.dataset.v=mi;
         o.textContent=String(mi).padStart(2,'0');
-        o.addEventListener('mousedown',e=>{e.preventDefault();m=mi;refreshDisplay();fire();closePicker();});
+        o.addEventListener('mousedown',e=>{e.preventDefault();m=mi;isSet=true;refreshDisplay();fire();closePicker();});
         mList.appendChild(o);
       });
       picker.append(hList,mList);
@@ -622,7 +625,7 @@
       const ecolon=document.createElement('span'); ecolon.className='ts-ecolon'; ecolon.textContent=':';
       editWrap.append(hIn,ecolon,mIn);
 
-      function commitEdit(){ h=Math.max(0,Math.min(23,parseInt(hIn.value)||0)); m=Math.max(0,Math.min(59,parseInt(mIn.value)||0)); refreshDisplay(); fire(); }
+      function commitEdit(){ h=Math.max(0,Math.min(23,parseInt(hIn.value)||0)); m=Math.max(0,Math.min(59,parseInt(mIn.value)||0)); isSet=true; refreshDisplay(); fire(); }
       let mode='display';
       function openPicker(){ mode='picker'; btn.style.display=''; btn.classList.add('active'); editWrap.style.display='none'; picker.style.display='flex'; refreshDisplay(); const cur=hList.querySelector(`[data-v="${h}"]`); if(cur)setTimeout(()=>cur.scrollIntoView({block:'center'}),0); }
       function closePicker(){ mode='display'; picker.style.display='none'; btn.classList.remove('active'); }
@@ -635,8 +638,12 @@
       document.addEventListener('mousedown',e=>{ if(!root.contains(e.target)){ if(mode==='picker')closePicker(); else if(mode==='edit')closeEdit(); } });
 
       root.append(btn,picker,editWrap); refreshDisplay();
-      root.getValue=()=>`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
-      root.setValue=t=>{[h,m]=t.split(':').map(Number);refreshDisplay();};
+      root.getValue=()=> isSet ? `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}` : '';
+      root.setValue=t=>{
+        if(t && t.includes(':')){ [h,m]=t.split(':').map(Number); isSet=true; }
+        else { isSet=false; }
+        refreshDisplay();
+      };
       root.addChangeListener=fn=>listeners.push(fn);
       return root;
     }
@@ -735,7 +742,7 @@
     function makeSlotRowA(k,idx,slot){
       const row=document.createElement('div'); row.className='slot-row';
       const sSel=makeTimeSel(slot.start), eSel=makeTimeSel(slot.end);
-      sSel.addChangeListener(()=>{ selected[k][idx].start=sSel.getValue(); const dur=getDur(); if(dur>0){const e=addMin(sSel.getValue(),dur);selected[k][idx].end=e;eSel.setValue(e);} regenerateA(); });
+      sSel.addChangeListener(()=>{ const v=sSel.getValue(); selected[k][idx].start=v; const dur=getDur(); if(dur>0 && v){const e=addMin(v,dur);selected[k][idx].end=e;eSel.setValue(e);} regenerateA(); });
       eSel.addChangeListener(()=>{ selected[k][idx].end=eSel.getValue(); regenerateA(); });
       const sep=document.createElement('span'); sep.className='slot-sep'; sep.textContent='〜';
       row.append(sSel,sep,eSel);
@@ -825,11 +832,23 @@
         const acts=document.createElement('div'); acts.className='slot-actions';
         QUICK_PRESETS.forEach(p=>{
           const b=document.createElement('button'); b.className='quick-btn'; b.textContent=p.label;
-          b.addEventListener('click',()=>{ const dur=getDur(); selected[k].push({start:p.start,end:dur>0?addMin(p.start,dur):''}); renderTimeEditor();regenerateB(); });
+          b.addEventListener('click',()=>{
+            // A→B 方式：未完了スロット（startあり/endなし）があれば endに、なければ新規スロット
+            const last = selected[k][selected[k].length-1];
+            if(last && last.start && !last.end){
+              last.end = p.start;
+            } else {
+              selected[k].push({ start: p.start, end: '' });
+            }
+            renderTimeEditor(); regenerateB();
+          });
           acts.appendChild(b);
         });
         const add=document.createElement('button'); add.className='add-slot-btn'; add.textContent='+ 追加';
-        add.addEventListener('click',()=>{ const dur=getDur(),last=selected[k].at(-1),st=last?.start||'10:00'; selected[k].push({start:st,end:dur>0?addMin(st,dur):''}); renderTimeEditor();regenerateB(); });
+        add.addEventListener('click',()=>{
+          selected[k].push({ start: '10:00', end: '' });
+          renderTimeEditor(); regenerateB();
+        });
         acts.appendChild(add); item.appendChild(acts); c.appendChild(item);
       });
       document.getElementById('resp-summary').innerHTML = slotCount ? `B社へ <b>${slotCount}</b> 件の日時を打診` : '時間を入力してください';
@@ -838,7 +857,7 @@
     function makeSlotRow(k,idx,slot){
       const row=document.createElement('div'); row.className='slot-row';
       const sSel=makeTimeSel(slot.start), eSel=makeTimeSel(slot.end);
-      sSel.addChangeListener(()=>{ selected[k][idx].start=sSel.getValue(); const dur=getDur(); if(dur>0){const e=addMin(sSel.getValue(),dur);selected[k][idx].end=e;eSel.setValue(e);} regenerateB(); });
+      sSel.addChangeListener(()=>{ selected[k][idx].start=sSel.getValue(); regenerateB(); });
       eSel.addChangeListener(()=>{ selected[k][idx].end=eSel.getValue(); regenerateB(); });
       const sep=document.createElement('span'); sep.className='slot-sep'; sep.textContent='〜';
       row.append(sSel,sep,eSel);
@@ -971,6 +990,12 @@
         if(!groups[ck]) groups[ck] = [];
         groups[ck].push(k);
       });
+      // 内容ありが1種類のみ＋内容なし → 内容なしを統合（同じ予定の候補日として扱う）
+      const nonEmpty = Object.keys(groups).filter(k => k !== '');
+      if(nonEmpty.length === 1 && groups['']){
+        groups[nonEmpty[0]] = groups[nonEmpty[0]].concat(groups['']).sort();
+        delete groups[''];
+      }
       return groups;
     }
     function sortedContentKeys(groups){
@@ -1060,7 +1085,7 @@
           sSel.addChangeListener(() => {
             slot.start = sSel.getValue();
             const dur = getDur();
-            if(dur > 0){ slot.end = addMin(slot.start, dur); eSel.setValue(slot.end); }
+            if(dur > 0 && slot.start){ slot.end = addMin(slot.start, dur); eSel.setValue(slot.end); }
             regenerateC(); regenerateD();
           });
           eSel.addChangeListener(() => {
