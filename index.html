@@ -472,9 +472,10 @@ FOSKIA image 後藤です。</textarea>
             </div>
             <div class="field">
               <label>本文（決定日程ごとに繰り返し表示）</label>
-              <div class="tmpl-hint">置換タグ：<b>{date}</b>=日付　<b>{time}</b>=時間　<b>{start+10}</b>=開始＋10分　<b>{room}</b>=ルーム番号　<b>{surname}</b>=確認者の苗字</div>
-              <textarea id="t-body-c" rows="3">{date}@EXタワープラスビル MA-{room} {time}
-{surname}様入り：{start+10}</textarea>
+              <div class="tmpl-hint">置換タグ：<b>{date}</b>=日付　<b>{time}</b>=時間　<b>{start+10}</b>=開始＋10分　<b>{room}</b>=ルーム番号　<b>{surname}</b>=確認者の苗字　<b>{content}</b>=その日の内容</div>
+              <textarea id="t-body-c" rows="4">{date}@EXタワープラスビル MA-{room} {time}
+{surname}様入り：{start+10}
+※{content}</textarea>
             </div>
             <div class="field">
               <label>結び文（末尾に1回だけ表示）</label>
@@ -634,13 +635,16 @@ FOSKIA image 後藤です。</textarea>
       const timeRange = startTime + (endTime ? '〜' + endTime : '');
       // 確認者の苗字（空白前の最初のパート）
       const surname = contactName ? contactName.trim().split(/[\s　]+/)[0] : '';
+      // その日の内容（STEP 1 で入力した contents[date]）
+      const slotContent = (safe.date && contents[safe.date]) ? contents[safe.date].trim() : '';
       let out = text
         .replace(/\{date\}/g, date)
         .replace(/\{time\}/g, timeRange)
         .replace(/\{start\}/g, startTime)
         .replace(/\{end\}/g, endTime)
         .replace(/\{room\}/g, roomNumber || '')
-        .replace(/\{surname\}/g, surname);
+        .replace(/\{surname\}/g, surname)
+        .replace(/\{content\}/g, slotContent);
       out = out.replace(/\{(start|end)([+\-＋－])(\d+)\}/g, (m, base, sign, n) => {
         const baseTime = base === 'start' ? startTime : endTime;
         if(!baseTime) return '';
@@ -651,7 +655,7 @@ FOSKIA image 後藤です。</textarea>
       return out;
     }
     function hasPlaceholders(text){
-      return /\{(date|time|start|end|room|surname)([+\-＋－]\d+)?\}/.test(text || '');
+      return /\{(date|time|start|end|room|surname|content)([+\-＋－]\d+)?\}/.test(text || '');
     }
     function getDur(){ return parseInt(document.getElementById('s-duration').value); }
 
@@ -771,7 +775,7 @@ FOSKIA image 後藤です。</textarea>
       const cIn=document.createElement('input'); cIn.type='text'; cIn.className='date-content-input'; cIn.placeholder='内容（任意）';
       cIn.setAttribute('list','content-options');
       cIn.value = contents[k] || '';
-      cIn.addEventListener('input',()=>{ contents[k]=cIn.value; regenerateA(); });
+      cIn.addEventListener('input',()=>{ contents[k]=cIn.value; regenerateA(); regenerateC(); });
       left.append(lbl, cIn);
       const actions=document.createElement('div'); actions.className='date-row-actions';
       const addTime=document.createElement('button'); addTime.className='add-time-btn'; addTime.textContent='+ 時間も追加';
@@ -797,7 +801,7 @@ FOSKIA image 後藤です。</textarea>
       const cIn=document.createElement('input'); cIn.type='text'; cIn.className='date-content-input'; cIn.placeholder='内容（任意）';
       cIn.setAttribute('list','content-options');
       cIn.value = contents[k] || '';
-      cIn.addEventListener('input',()=>{ contents[k]=cIn.value; regenerateA(); });
+      cIn.addEventListener('input',()=>{ contents[k]=cIn.value; regenerateA(); regenerateC(); });
       left.append(lbl, cIn);
       const rm=document.createElement('button'); rm.className='remove-date'; rm.textContent='×';
       rm.title='この日を候補から削除';
@@ -1766,6 +1770,18 @@ FOSKIA image 後藤です。</textarea>
       if(t.selD){ const i=getPresets('d').findIndex(p=>p.name===t.selD); if(i>=0) document.getElementById('preset-sel-d').value=i; }
     }
 
+    // C body に {content} 行がない（旧デフォルトのまま）なら ※{content} 行を追加
+    function migrateCBodyAddContent(){
+      const bcEl = document.getElementById('t-body-c');
+      if(!bcEl) return;
+      const PREV_DEFAULTS = [
+        "{date}@EXタワープラスビル MA-{room} {time}\n{surname}様入り：{start+10}",
+      ];
+      if(PREV_DEFAULTS.includes(bcEl.value)){
+        bcEl.value = bcEl.value + '\n※{content}';
+      }
+    }
+
     // D body の {surname}様 を ナレーター に戻す（前回マイグレーションの取り消し）
     // 併せて、C body が空なら D body の中身を C へ移動（surname入りの内容はA社向けへ）
     function revertDBodySurname(){
@@ -2022,6 +2038,8 @@ FOSKIA image 後藤です。</textarea>
     autoMigrateDTemplate();
     // 前回マイグレーション（ナレーター→{surname}様）を取り消し、surname入りはCへ移動
     revertDBodySurname();
+    // C body に ※{content} 行を追加（旧デフォルトの場合）
+    migrateCBodyAddContent();
     // 確認者のデフォルト適用（未選択ならデフォルトを使う）
     if(!contactName){
       const cDef = getContactDefault();
