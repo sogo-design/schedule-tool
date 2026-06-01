@@ -703,6 +703,35 @@ FOSKIA image 後藤です。</textarea>
     }
     applyBuiltinPresets();
 
+    // C/D の保存済みテンプレートに body フィールドがなければ補完（旧形式データの救済）
+    function migratePresetBodies(){
+      const defBodies = {
+        c: "{date}@{location} MA-{room} {time}\n{surname}様入り：{start+10}\n※{content}",
+        d: "{date}@{location} MA-{room} {time}\nナレーター入り：{start+10}"
+      };
+      ['c','d'].forEach(w => {
+        let raw;
+        try { raw = JSON.parse(localStorage.getItem('tmpl_presets_'+w)); } catch(e){ return; }
+        if(!Array.isArray(raw)) return;
+        let changed = false;
+        raw.forEach(p => {
+          if(p && (p.body === undefined || p.body === null)){ p.body = defBodies[w]; changed = true; }
+        });
+        if(changed) localStorage.setItem('tmpl_presets_'+w, JSON.stringify(raw));
+      });
+      // tmpl_current にも bc/bd がなければ補完
+      try {
+        const cur = JSON.parse(localStorage.getItem('tmpl_current'));
+        if(cur){
+          let changed = false;
+          if(!cur.bc){ cur.bc = defBodies.c; changed = true; }
+          if(!cur.bd){ cur.bd = defBodies.d; changed = true; }
+          if(changed) localStorage.setItem('tmpl_current', JSON.stringify(cur));
+        }
+      } catch(e){}
+    }
+    migratePresetBodies();
+
     // 日本の祝日を自動計算（2025〜2040年）
     function _pad2(n){ return String(n).padStart(2,'0'); }
     function _ymd(d){ return `${d.getFullYear()}-${_pad2(d.getMonth()+1)}-${_pad2(d.getDate())}`; }
