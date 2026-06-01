@@ -1982,6 +1982,8 @@ FOSKIA image 後藤です。</textarea>
     document.getElementById('next-month').addEventListener('click',()=>{ if(++viewMonth>11){viewMonth=0;viewYear++;} renderCalendar(); saveSession(); });
     document.getElementById('s-duration').addEventListener('change', ()=>{
       saveSession();
+      // STEP 2 の「上記日程のどこか○○ほど」を所要時間に連動させる
+      regenerateB();
       // STEP 3 表示中なら、各 finalSlot の終了時刻を再計算
       if(document.getElementById('step3').style.display==='block'){
         const dur=getDur();
