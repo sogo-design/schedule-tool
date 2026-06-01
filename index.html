@@ -637,9 +637,54 @@ FOSKIA image 後藤です。</textarea>
     // 組み込みデフォルト（URLに焼き込み）。空オブジェクトのキーは適用しない。
     // ここに値を入れておくと、初めて開いた人にも自動でそのテンプレートが入る。
     const BUILTIN_PRESETS = {
-      // 例: "contact_presets": ["半田 裕典"], "room_presets": ["405"] ...
+      contact_presets: ["半田 裕典"],
+      contact_default: "半田 裕典",
+      content_presets: ["WRC番宣","スーパーフォーミュラ番宣","大相撲番宣"],
+      room_presets: ["405","406"],
+      room_default: "405",
+      location_presets: ["EXタワープラスビル"],
+      location_default: "EXタワープラスビル",
+      tmpl_default_a: "デフォルト",
+      tmpl_default_b: "デフォルト",
+      tmpl_default_c: "デフォルト",
+      tmpl_default_d: "デフォルト",
+      tmpl_presets_a: [{
+        name: "デフォルト",
+        header: "お世話になっております。\n日程についてお伺いしたくご連絡いたします。\n\n下記の候補日の中から、ご都合のよい日と当日空いているお時間帯をお知らせください。",
+        footer: "お手数をおかけしますが、何卒よろしくお願いいたします。"
+      }],
+      tmpl_presets_b: [{
+        name: "デフォルト",
+        header: "お世話になっております。\n日程についてご連絡いたします。\n\n以下の日程でいかがでしょうか。",
+        footer: "ご都合のよい日程をお知らせいただけますと幸いです。\n何卒よろしくお願いいたします。"
+      }],
+      tmpl_presets_c: [{
+        name: "デフォルト",
+        header: "塩沢様\n\nいつもお世話になっております。\nご確認誠にありがとうございました。",
+        body: "{date}@{location} MA-{room} {time}\n{surname}様入り：{start+10}\n※{content}",
+        footer: "お手数ですがご確認よろしくお願いいたします。"
+      }],
+      tmpl_presets_d: [{
+        name: "デフォルト",
+        header: "株式会社 東京サウンド・プロダクション\n松丸様\n\nいつもお世話になっております。\nFOSKIA image 後藤です。\n\nそれでは以下の時間でお願い出来ますでしょうか。",
+        body: "{date}@{location} MA-{room} {time}\nナレーター入り：{start+10}",
+        footer: "お手数ですがご確認よろしくお願いいたします。"
+      }],
+      tmpl_current: {
+        ha: "株式会社青二プロダクション\n塩沢様\n良川様\n山﨑様\n\nいつもお世話になっております。\nFOSKIA image 後藤です。",
+        fa: "お手数おかけしますが、ご確認頂けますと幸いです。\n何卒宜しくお願い申し上げます。",
+        hb: "株式会社 東京サウンド・プロダクション\n松丸様\n\nいつもお世話になっております。\nFOSKIA image 後藤です。\n\n以下の日付でスタジオの空きをご確認いただけますでしょうか。",
+        fb: "お手数おかけしますが、\nご確認よろしくお願いいたします。",
+        hc: "塩沢様\n\nいつもお世話になっております。\nご確認誠にありがとうございました。",
+        bc: "{date}@{location} MA-{room} {time}\n{surname}様入り：{start+10}\n※{content}",
+        fc: "お手数ですがご確認よろしくお願いいたします。",
+        hd: "株式会社 東京サウンド・プロダクション\n松丸様\n\nいつもお世話になっております。\nFOSKIA image 後藤です。\n\nそれでは以下の時間でお願い出来ますでしょうか。",
+        bd: "{date}@{location} MA-{room} {time}\nナレーター入り：{start+10}",
+        fd: "お手数ですがご確認よろしくお願いいたします。",
+        selA: "デフォルト", selB: "デフォルト", selC: "デフォルト", selD: "デフォルト"
+      }
     };
-    const BUILTIN_VERSION = '0'; // BUILTIN_PRESETS を更新したらこの番号を上げる
+    const BUILTIN_VERSION = '1'; // BUILTIN_PRESETS を更新したらこの番号を上げる
 
     // 初回 or BUILTIN更新時、ローカルに無いプリセットを組み込みデフォルトで補完
     function applyBuiltinPresets(){
