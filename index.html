@@ -1251,7 +1251,7 @@ FOSKIA image 後藤です。</textarea>
           const dur = ck ? getDurationFor(ck) : getDur();
           if(dur > 0){
             const note = document.createElement('span'); note.className = 'dur-note';
-            note.textContent = `所要時間: ${fmtDur(dur)}`;
+            note.textContent = `所要時間: ${fmtDur(dur)}ほど`;
             timeRow.appendChild(note);
           }
           timeSection.appendChild(timeRow);
