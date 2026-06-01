@@ -567,7 +567,7 @@ FOSKIA image 後藤です。</textarea>
             </div>
             <div class="field">
               <label>本文（決定日程ごとに繰り返し表示）</label>
-              <div class="tmpl-hint">置換タグ：<b>{date}</b>=日付　<b>{time}</b>=時間　<b>{start+10}</b>=開始＋10分　<b>{narout}</b>=入り終了時刻　<b>{location}</b>=場所　<b>{room}</b>=ルーム番号</div>
+              <div class="tmpl-hint">置換タグ：<b>{date}</b>=日付　<b>{time}</b>=時間　<b>{start+10}</b>=開始＋10分　<b>{location}</b>=場所　<b>{room}</b>=ルーム番号</div>
               <textarea id="t-body-d" rows="3">{date}@{location} MA-{room} {time}
 ナレーター入り：{start+10}</textarea>
             </div>
@@ -678,7 +678,7 @@ FOSKIA image 後藤です。</textarea>
       tmpl_presets_d: [{
         name: "デフォルト",
         header: "株式会社 東京サウンド・プロダクション\n松丸様\n\nいつもお世話になっております。\nFOSKIA image 後藤です。\n\nそれでは以下の時間でお願い出来ますでしょうか。",
-        body: "{date}@{location} MA-{room} {time}\nナレーター入り：{start+10}〜{narout}",
+        body: "{date}@{location} MA-{room} {time}\nナレーター入り：{start+10}",
         footer: "お手数ですがご確認よろしくお願いいたします。"
       }],
       tmpl_current: {
@@ -690,12 +690,12 @@ FOSKIA image 後藤です。</textarea>
         bc: "{date}@{location} MA-{room} {time}\n{surname}様入り：{start+10}〜{narout}\n※{content}",
         fc: "お手数ですがご確認よろしくお願いいたします。",
         hd: "株式会社 東京サウンド・プロダクション\n松丸様\n\nいつもお世話になっております。\nFOSKIA image 後藤です。\n\nそれでは以下の時間でお願い出来ますでしょうか。",
-        bd: "{date}@{location} MA-{room} {time}\nナレーター入り：{start+10}〜{narout}",
+        bd: "{date}@{location} MA-{room} {time}\nナレーター入り：{start+10}",
         fd: "お手数ですがご確認よろしくお願いいたします。",
         selA: "デフォルト", selB: "デフォルト", selC: "デフォルト", selD: "デフォルト"
       }
     };
-    const BUILTIN_VERSION = '4'; // BUILTIN_PRESETS を更新したらこの番号を上げる
+    const BUILTIN_VERSION = '5'; // BUILTIN_PRESETS を更新したらこの番号を上げる
 
     // 初回 or BUILTIN更新時、ローカルに無いプリセットを組み込みデフォルトで補完
     function applyBuiltinPresets(){
@@ -746,7 +746,7 @@ FOSKIA image 後藤です。</textarea>
     // テンプレートを正しいデフォルト（BUILTIN）へ強制リセット（1回のみ）。
     // 以前のバージョンで汎用文に戻ってしまったテンプレートを正しい内容に修復する。
     function forceTemplateReset(){
-      const FLAG = '_tmpl_reset_v4';
+      const FLAG = '_tmpl_reset_v5';
       if(localStorage.getItem(FLAG)){ return; }
       const tmplKeys = [
         'tmpl_presets_a','tmpl_presets_b','tmpl_presets_c','tmpl_presets_d',
