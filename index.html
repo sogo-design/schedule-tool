@@ -669,22 +669,11 @@ FOSKIA image 後藤です。</textarea>
         header: "株式会社 東京サウンド・プロダクション\n松丸様\n\nいつもお世話になっております。\nFOSKIA image 後藤です。\n\nそれでは以下の時間でお願い出来ますでしょうか。",
         body: "{date}@{location} MA-{room} {time}\nナレーター入り：{start+10}",
         footer: "お手数ですがご確認よろしくお願いいたします。"
-      }],
-      tmpl_current: {
-        ha: "株式会社青二プロダクション\n塩沢様\n良川様\n山﨑様\n\nいつもお世話になっております。\nFOSKIA image 後藤です。",
-        fa: "お手数おかけしますが、ご確認頂けますと幸いです。\n何卒宜しくお願い申し上げます。",
-        hb: "株式会社 東京サウンド・プロダクション\n松丸様\n\nいつもお世話になっております。\nFOSKIA image 後藤です。\n\n以下の日付でスタジオの空きをご確認いただけますでしょうか。",
-        fb: "お手数おかけしますが、\nご確認よろしくお願いいたします。",
-        hc: "塩沢様\n\nいつもお世話になっております。\nご確認誠にありがとうございました。",
-        bc: "{date}@{location} MA-{room} {time}\n{surname}様入り：{start+10}\n※{content}",
-        fc: "お手数ですがご確認よろしくお願いいたします。",
-        hd: "株式会社 東京サウンド・プロダクション\n松丸様\n\nいつもお世話になっております。\nFOSKIA image 後藤です。\n\nそれでは以下の時間でお願い出来ますでしょうか。",
-        bd: "{date}@{location} MA-{room} {time}\nナレーター入り：{start+10}",
-        fd: "お手数ですがご確認よろしくお願いいたします。",
-        selA: "デフォルト", selB: "デフォルト", selC: "デフォルト", selD: "デフォルト"
-      }
+      }]
+      // 注：tmpl_current（進行中の編集状態）は焼き込まない。
+      // 新規ユーザーには上記の tmpl_presets_* デフォルトが起動時に適用される。
     };
-    const BUILTIN_VERSION = '1'; // BUILTIN_PRESETS を更新したらこの番号を上げる
+    const BUILTIN_VERSION = '2'; // BUILTIN_PRESETS を更新したらこの番号を上げる
 
     // 初回 or BUILTIN更新時、ローカルに無いプリセットを組み込みデフォルトで補完
     function applyBuiltinPresets(){
@@ -731,6 +720,23 @@ FOSKIA image 後藤です。</textarea>
       } catch(e){}
     }
     migratePresetBodies();
+
+    // v1 で誤って焼き込まれた「進行中編集状態」(tmpl_current)を除去。
+    // BUILTIN v1 の宛名入り内容と完全一致する場合のみ削除（手入力データは保護）。
+    function cleanupV1BakedCurrent(){
+      const FLAG = '_v1current_cleaned';
+      if(localStorage.getItem(FLAG)){ return; }
+      try {
+        const cur = JSON.parse(localStorage.getItem('tmpl_current'));
+        const BAKED_HA = "株式会社青二プロダクション\n塩沢様\n良川様\n山﨑様\n\nいつもお世話になっております。\nFOSKIA image 後藤です。";
+        const BAKED_HB = "株式会社 東京サウンド・プロダクション\n松丸様\n\nいつもお世話になっております。\nFOSKIA image 後藤です。\n\n以下の日付でスタジオの空きをご確認いただけますでしょうか。";
+        if(cur && cur.ha === BAKED_HA && cur.hb === BAKED_HB){
+          localStorage.removeItem('tmpl_current'); // デフォルトテンプレートに戻す
+        }
+      } catch(e){}
+      localStorage.setItem(FLAG, '1');
+    }
+    cleanupV1BakedCurrent();
 
     // 日本の祝日を自動計算（2025〜2040年）
     function _pad2(n){ return String(n).padStart(2,'0'); }
