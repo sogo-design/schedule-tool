@@ -53,6 +53,16 @@
     .room-input { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: .82rem; padding: 0 11px; height: 36px; width: 110px; font-family: inherit; outline: none; transition: border-color .15s; }
     .room-input:focus { border-color: var(--accent); }
 
+    /* ── 内容ごとの所要時間 ── */
+    .content-dur-bar { max-width: 840px; margin: 0 auto 16px; padding: 14px 16px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+    .content-dur-bar > label { font-size: .68rem; color: var(--text3); letter-spacing: .08em; font-weight: 600; display: block; margin-bottom: 10px; }
+    .content-dur-bar .dur-list { display: flex; flex-direction: column; gap: 7px; }
+    .content-dur-bar .dur-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .content-dur-bar .dur-label { font-size: .85rem; color: var(--text); font-weight: 600; min-width: 140px; flex-shrink: 0; }
+    .content-dur-bar .dur-select { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: .82rem; padding: 0 11px; height: 32px; font-family: inherit; outline: none; cursor: pointer; min-width: 110px; transition: border-color .15s; }
+    .content-dur-bar .dur-select:focus { border-color: var(--accent); }
+    .content-dur-bar .dur-empty { font-size: .72rem; color: var(--text3); padding: 6px 0; font-style: italic; }
+
     /* ── Layout ── */
     .layout { max-width: 840px; margin: 0 auto; display: grid; grid-template-columns: 292px 1fr; gap: 12px; align-items: start; }
     .layout.s2 { grid-template-columns: 1fr 1fr; }
@@ -313,6 +323,13 @@
   </div>
 
   <datalist id="content-options"></datalist>
+
+  <div class="content-dur-bar">
+    <label>内容ごとの所要時間</label>
+    <div class="dur-list" id="content-dur-list">
+      <div class="dur-empty">内容プリセットを追加すると、ここで個別に所要時間を設定できます</div>
+    </div>
+  </div>
 
   <div class="content-bar">
     <label>MAルーム番号（任意）</label>
@@ -1689,6 +1706,60 @@ FOSKIA image 後藤です。</textarea>
         const o = document.createElement('option'); o.value = v; list.appendChild(o);
       });
     }
+    function refreshDurationList(){
+      const container = document.getElementById('content-dur-list');
+      if(!container) return;
+      const presets = getContentPresets();
+      const durs = getContentDurations();
+      const defaultDur = getDur() || 60;
+      container.innerHTML = '';
+      if(presets.length === 0){
+        const note = document.createElement('div');
+        note.className = 'dur-empty';
+        note.textContent = '内容プリセットを追加すると、ここで個別に所要時間を設定できます';
+        container.appendChild(note);
+        return;
+      }
+      const STD_OPTS = [
+        [30, '30 分'], [60, '1 時間'], [90, '1.5 時間'],
+        [120, '2 時間'], [180, '3 時間']
+      ];
+      presets.forEach(name => {
+        const row = document.createElement('div'); row.className = 'dur-row';
+        const lbl = document.createElement('span'); lbl.className = 'dur-label'; lbl.textContent = name;
+        const sel = document.createElement('select'); sel.className = 'dur-select'; sel.dataset.content = name;
+        const curDur = (typeof durs[name] === 'number' && durs[name] > 0) ? durs[name] : defaultDur;
+        const opts = STD_OPTS.slice();
+        if(!opts.some(([v]) => v === curDur)) opts.push([curDur, fmtDur(curDur)]);
+        opts.sort((a,b) => a[0] - b[0]);
+        opts.forEach(([v, t]) => {
+          const o = document.createElement('option');
+          o.value = String(v); o.textContent = t;
+          if(v === curDur) o.selected = true;
+          sel.appendChild(o);
+        });
+        sel.addEventListener('change', () => {
+          const d = parseInt(sel.value) || defaultDur;
+          const obj = getContentDurations();
+          obj[name] = d;
+          setContentDurations(obj);
+          regenerateB();
+          // STEP 3 表示中なら、その内容の確定終了時刻も再計算
+          if(document.getElementById('step3').style.display === 'block'){
+            const slot = finalSlots[name];
+            if(slot && slot.start){
+              slot.end = addMin(slot.start, d);
+              renderFinalPicker(); regenerateC(); regenerateD();
+            }
+          }
+          refreshContentSelect();
+        });
+        row.appendChild(lbl);
+        row.appendChild(sel);
+        container.appendChild(row);
+      });
+    }
+
     function refreshContentSelect(){
       const sel = document.getElementById('content-preset-sel');
       const def = getContentDefault();
@@ -1723,6 +1794,7 @@ FOSKIA image 後藤です。</textarea>
     function setupContentPresets(){
       refreshContentSelect();
       refreshContentDatalist();
+      refreshDurationList();
 
       document.getElementById('content-preset-sel').addEventListener('change', () => {
         updateContentBtnState(); updateContentDefaultBtn();
@@ -1732,13 +1804,12 @@ FOSKIA image 後藤です。</textarea>
         if(!val) return;
         const arr = getContentPresets();
         if(arr.includes(val)){ alert('同じ内容が既に保存されています'); document.getElementById('content-preset-sel').value = val; updateContentBtnState(); updateContentDefaultBtn(); return; }
-        const defDur = getDur() || 60;
-        const durStr = prompt(`「${val}」の所要時間（分）を入力してください\n例：30、60、90、120`, String(defDur));
-        if(durStr === null) return;
-        const dur = parseInt(durStr) || defDur;
         arr.push(val); setContentPresetsList(arr);
-        const durs = getContentDurations(); durs[val] = dur; setContentDurations(durs);
-        refreshContentSelect(); refreshContentDatalist();
+        // デフォルトの所要時間を s-duration から自動セット
+        const durs = getContentDurations();
+        if(!(val in durs)) durs[val] = getDur() || 60;
+        setContentDurations(durs);
+        refreshContentSelect(); refreshContentDatalist(); refreshDurationList();
         document.getElementById('content-preset-sel').value = val;
         updateContentBtnState(); updateContentDefaultBtn();
         regenerateB();
@@ -1747,26 +1818,17 @@ FOSKIA image 後藤です。</textarea>
         const sel = document.getElementById('content-preset-sel');
         const cur = sel.value;
         if(!cur){ alert('改名する内容を選択してください'); return; }
-        const newVal = (prompt('内容名を入力してください（同じ名前のままなら所要時間のみ変更）', cur)||'').trim();
-        if(!newVal) return;
+        const newVal = (prompt('新しい内容名を入力してください', cur)||'').trim();
+        if(!newVal || newVal === cur) return;
         const arr = getContentPresets();
-        if(newVal !== cur && arr.includes(newVal)){ alert('同じ内容が既に保存されています'); return; }
+        if(arr.includes(newVal)){ alert('同じ内容が既に保存されています'); return; }
+        const idx = arr.indexOf(cur);
+        if(idx >= 0) arr[idx] = newVal;
+        setContentPresetsList(arr);
         const durs = getContentDurations();
-        const curDur = (typeof durs[cur] === 'number') ? durs[cur] : (getDur() || 60);
-        const durStr = prompt(`「${newVal}」の所要時間（分）を入力してください`, String(curDur));
-        if(durStr === null) return;
-        const newDur = parseInt(durStr) || curDur;
-        // 名前変更を反映
-        if(newVal !== cur){
-          const idx = arr.indexOf(cur);
-          if(idx >= 0) arr[idx] = newVal;
-          setContentPresetsList(arr);
-          delete durs[cur];
-          if(getContentDefault() === cur) setContentDefaultVal(newVal);
-        }
-        durs[newVal] = newDur;
-        setContentDurations(durs);
-        refreshContentSelect(); refreshContentDatalist();
+        if(cur in durs){ durs[newVal] = durs[cur]; delete durs[cur]; setContentDurations(durs); }
+        if(getContentDefault() === cur) setContentDefaultVal(newVal);
+        refreshContentSelect(); refreshContentDatalist(); refreshDurationList();
         regenerateB();
       });
       document.getElementById('content-default').addEventListener('click', () => {
@@ -1784,7 +1846,7 @@ FOSKIA image 後藤です。</textarea>
         setContentPresetsList(arr);
         const durs = getContentDurations(); delete durs[cur]; setContentDurations(durs);
         if(getContentDefault() === cur) setContentDefaultVal(null);
-        refreshContentSelect(); refreshContentDatalist();
+        refreshContentSelect(); refreshContentDatalist(); refreshDurationList();
         regenerateB();
       });
     }
@@ -2042,6 +2104,8 @@ FOSKIA image 後藤です。</textarea>
     document.getElementById('next-month').addEventListener('click',()=>{ if(++viewMonth>11){viewMonth=0;viewYear++;} renderCalendar(); saveSession(); });
     document.getElementById('s-duration').addEventListener('change', ()=>{
       saveSession();
+      // 個別所要時間ドロップダウンのデフォルト表示も更新
+      refreshDurationList();
       // STEP 2 の「上記日程のどこか○○ほど」を所要時間に連動させる
       regenerateB();
       // STEP 3 表示中なら、各 finalSlot の終了時刻を内容ごとの所要時間で再計算
