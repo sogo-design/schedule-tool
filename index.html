@@ -230,6 +230,24 @@
     .hist-del { background: none; border: none; color: var(--text3); cursor: pointer; font-size: .9rem; padding: 4px 9px; border-radius: 5px; flex-shrink: 0; transition: all .1s; }
     .hist-del:hover { color: var(--danger); background: rgba(224,92,106,.1); }
     .hist-empty { color: var(--text3); font-size: .8rem; text-align: center; padding: 32px 0; }
+
+    /* ── Settings modal ── */
+    .settings-section { margin-bottom: 20px; }
+    .settings-section:last-child { margin-bottom: 0; }
+    .settings-section h3 { font-size: .82rem; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+    .settings-section p { font-size: .72rem; color: var(--text3); line-height: 1.6; margin-bottom: 10px; }
+    .settings-textarea { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: .72rem; padding: 9px 11px; font-family: monospace; line-height: 1.5; resize: vertical; min-height: 90px; outline: none; transition: border-color .12s; }
+    .settings-textarea:focus { border-color: var(--accent); }
+    .settings-btn-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    .settings-action-btn { background: var(--accent); border: none; color: #fff; font-size: .78rem; font-weight: 700; padding: 8px 18px; border-radius: var(--radius-sm); cursor: pointer; font-family: inherit; transition: opacity .12s; }
+    .settings-action-btn:hover { opacity: .82; }
+    .settings-action-btn.sub { background: var(--surface3); color: var(--text2); border: 1px solid var(--border); }
+    .settings-action-btn.sub:hover { border-color: var(--accent); color: var(--accent); opacity: 1; }
+    .settings-action-btn.copied { background: var(--green); }
+    .settings-msg { font-size: .72rem; margin-top: 8px; min-height: 1.1em; }
+    .settings-msg.ok { color: var(--green); }
+    .settings-msg.err { color: var(--danger); }
+    .settings-divider { height: 1px; background: var(--border); margin: 18px 0; }
     .hist-step.s3 { background: rgba(255,200,80,.18); color: #ffcb5a; }
 
     /* ── Final slot picker (STEP 3) ── */
@@ -261,6 +279,7 @@
     <div class="header-top">
       <h1>日程調整ツール</h1>
       <div class="header-actions">
+        <button class="hist-btn" id="settings-btn">設定の共有</button>
         <button class="hist-btn" id="hist-btn">履歴 <span class="hist-count hidden" id="hist-count">0</span></button>
         <button class="new-task-btn" id="new-task-btn">+ 新規作成</button>
       </div>
@@ -567,9 +586,77 @@ FOSKIA image 後藤です。</textarea>
     </div>
   </div>
 
+  <!-- ══ 設定の共有モーダル ══ -->
+  <div class="modal-overlay" id="settings-modal">
+    <div class="hist-modal-box">
+      <div class="hist-modal-header">
+        <h2>テンプレート設定の共有・引き継ぎ</h2>
+        <button class="modal-close" id="settings-close">✕</button>
+      </div>
+
+      <div class="settings-section">
+        <h3>① エクスポート（書き出し）</h3>
+        <p>現在登録しているテンプレート（確認者・内容・場所・ルーム番号・文面）を書き出します。下のボタンでコピーして、引き継ぎ先の方に渡してください。</p>
+        <textarea class="settings-textarea" id="settings-export" readonly placeholder="「設定を書き出す」を押すとここに表示されます"></textarea>
+        <div class="settings-btn-row">
+          <button class="settings-action-btn" id="settings-export-btn">設定を書き出す</button>
+          <button class="settings-action-btn sub" id="settings-copy-btn">コピー</button>
+        </div>
+        <div class="settings-msg" id="settings-export-msg"></div>
+      </div>
+
+      <div class="settings-divider"></div>
+
+      <div class="settings-section">
+        <h3>② インポート（読み込み）</h3>
+        <p>受け取った設定データを下に貼り付けて「読み込む」を押すと、テンプレートが反映されます。<br>※現在の設定は上書きされます。</p>
+        <textarea class="settings-textarea" id="settings-import" placeholder="ここに設定データを貼り付けてください"></textarea>
+        <div class="settings-btn-row">
+          <button class="settings-action-btn" id="settings-import-btn">読み込む</button>
+        </div>
+        <div class="settings-msg" id="settings-import-msg"></div>
+      </div>
+    </div>
+  </div>
+
   <script>
     const DOW_JA = ['日','月','火','水','木','金','土'];
     const NUMS   = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩'];
+
+    // ── テンプレート設定の共有 ────────────────────────
+    // エクスポート/インポート対象のlocalStorageキー
+    const PRESET_KEYS = [
+      'tmpl_presets_a','tmpl_presets_b','tmpl_presets_c','tmpl_presets_d',
+      'tmpl_default_a','tmpl_default_b','tmpl_default_c','tmpl_default_d',
+      'tmpl_current',
+      'contact_presets','contact_default',
+      'content_presets','content_default',
+      'room_presets','room_default',
+      'location_presets','location_default',
+    ];
+    // 組み込みデフォルト（URLに焼き込み）。空オブジェクトのキーは適用しない。
+    // ここに値を入れておくと、初めて開いた人にも自動でそのテンプレートが入る。
+    const BUILTIN_PRESETS = {
+      // 例: "contact_presets": ["半田 裕典"], "room_presets": ["405"] ...
+    };
+    const BUILTIN_VERSION = '0'; // BUILTIN_PRESETS を更新したらこの番号を上げる
+
+    // 初回 or BUILTIN更新時、ローカルに無いプリセットを組み込みデフォルトで補完
+    function applyBuiltinPresets(){
+      const keys = Object.keys(BUILTIN_PRESETS);
+      if(keys.length === 0) return;
+      const storedVer = localStorage.getItem('_builtin_version');
+      if(storedVer === BUILTIN_VERSION) return; // 適用済み
+      keys.forEach(key => {
+        // 既にユーザーが値を持っている場合は尊重して上書きしない
+        if(localStorage.getItem(key) === null){
+          const val = BUILTIN_PRESETS[key];
+          localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val));
+        }
+      });
+      localStorage.setItem('_builtin_version', BUILTIN_VERSION);
+    }
+    applyBuiltinPresets();
 
     // 日本の祝日を自動計算（2025〜2040年）
     function _pad2(n){ return String(n).padStart(2,'0'); }
@@ -2354,6 +2441,71 @@ FOSKIA image 後藤です。</textarea>
     setupRoom();
     setupLocation();
     setupContentPresets();
+    setupSettingsShare();
+
+    // ── 設定の共有（エクスポート/インポート）─────────
+    function setupSettingsShare(){
+      const openBtn = document.getElementById('settings-btn');
+      const modal = document.getElementById('settings-modal');
+      const closeBtn = document.getElementById('settings-close');
+      const exportArea = document.getElementById('settings-export');
+      const importArea = document.getElementById('settings-import');
+      const exportBtn = document.getElementById('settings-export-btn');
+      const copyBtn = document.getElementById('settings-copy-btn');
+      const importBtn = document.getElementById('settings-import-btn');
+      const exportMsg = document.getElementById('settings-export-msg');
+      const importMsg = document.getElementById('settings-import-msg');
+
+      openBtn.addEventListener('click', () => {
+        exportMsg.textContent = ''; importMsg.textContent = '';
+        exportArea.value = ''; importArea.value = '';
+        modal.classList.add('open');
+      });
+      closeBtn.addEventListener('click', () => modal.classList.remove('open'));
+      modal.addEventListener('click', e => { if(e.target.id === 'settings-modal') modal.classList.remove('open'); });
+
+      exportBtn.addEventListener('click', () => {
+        const data = { _type: 'schedule-tool-settings', _v: 1 };
+        PRESET_KEYS.forEach(k => {
+          const v = localStorage.getItem(k);
+          if(v !== null) data[k] = v;
+        });
+        exportArea.value = JSON.stringify(data);
+        exportMsg.className = 'settings-msg ok';
+        exportMsg.textContent = '書き出しました。「コピー」を押して引き継ぎ先に渡してください。';
+      });
+
+      copyBtn.addEventListener('click', () => {
+        if(!exportArea.value){ exportBtn.click(); }
+        navigator.clipboard.writeText(exportArea.value).then(() => {
+          copyBtn.textContent = 'コピーしました'; copyBtn.classList.add('copied');
+          setTimeout(() => { copyBtn.textContent = 'コピー'; copyBtn.classList.remove('copied'); }, 1800);
+        }).catch(() => {
+          exportArea.select(); document.execCommand('copy');
+          copyBtn.textContent = 'コピーしました'; copyBtn.classList.add('copied');
+          setTimeout(() => { copyBtn.textContent = 'コピー'; copyBtn.classList.remove('copied'); }, 1800);
+        });
+      });
+
+      importBtn.addEventListener('click', () => {
+        const raw = importArea.value.trim();
+        if(!raw){ importMsg.className = 'settings-msg err'; importMsg.textContent = 'データを貼り付けてください。'; return; }
+        let data;
+        try { data = JSON.parse(raw); } catch(e){
+          importMsg.className = 'settings-msg err'; importMsg.textContent = 'データの形式が正しくありません。コピーし直して貼り付けてください。'; return;
+        }
+        if(!data || data._type !== 'schedule-tool-settings'){
+          importMsg.className = 'settings-msg err'; importMsg.textContent = 'このツールの設定データではないようです。'; return;
+        }
+        let count = 0;
+        PRESET_KEYS.forEach(k => {
+          if(typeof data[k] === 'string'){ localStorage.setItem(k, data[k]); count++; }
+        });
+        importMsg.className = 'settings-msg ok';
+        importMsg.textContent = `${count}件の設定を読み込みました。ページを再読み込みします…`;
+        setTimeout(() => location.reload(), 1200);
+      });
+    }
 
     // ── Startup ──────────────────────────────────────
     loadTmplCurrent();
