@@ -650,13 +650,13 @@ FOSKIA image 後藤です。</textarea>
       tmpl_default_d: "デフォルト",
       tmpl_presets_a: [{
         name: "デフォルト",
-        header: "お世話になっております。\n日程についてお伺いしたくご連絡いたします。\n\n下記の候補日の中から、ご都合のよい日と当日空いているお時間帯をお知らせください。",
-        footer: "お手数をおかけしますが、何卒よろしくお願いいたします。"
+        header: "株式会社青二プロダクション\n塩沢様\n良川様\n山﨑様\n\nいつもお世話になっております。\nFOSKIA image 後藤です。",
+        footer: "お手数おかけしますが、ご確認頂けますと幸いです。\n何卒宜しくお願い申し上げます。"
       }],
       tmpl_presets_b: [{
         name: "デフォルト",
-        header: "お世話になっております。\n日程についてご連絡いたします。\n\n以下の日程でいかがでしょうか。",
-        footer: "ご都合のよい日程をお知らせいただけますと幸いです。\n何卒よろしくお願いいたします。"
+        header: "株式会社 東京サウンド・プロダクション\n松丸様\n\nいつもお世話になっております。\nFOSKIA image 後藤です。\n\n以下の日付でスタジオの空きをご確認いただけますでしょうか。",
+        footer: "お手数おかけしますが、\nご確認よろしくお願いいたします。"
       }],
       tmpl_presets_c: [{
         name: "デフォルト",
@@ -669,11 +669,22 @@ FOSKIA image 後藤です。</textarea>
         header: "株式会社 東京サウンド・プロダクション\n松丸様\n\nいつもお世話になっております。\nFOSKIA image 後藤です。\n\nそれでは以下の時間でお願い出来ますでしょうか。",
         body: "{date}@{location} MA-{room} {time}\nナレーター入り：{start+10}",
         footer: "お手数ですがご確認よろしくお願いいたします。"
-      }]
-      // 注：tmpl_current（進行中の編集状態）は焼き込まない。
-      // 新規ユーザーには上記の tmpl_presets_* デフォルトが起動時に適用される。
+      }],
+      tmpl_current: {
+        ha: "株式会社青二プロダクション\n塩沢様\n良川様\n山﨑様\n\nいつもお世話になっております。\nFOSKIA image 後藤です。",
+        fa: "お手数おかけしますが、ご確認頂けますと幸いです。\n何卒宜しくお願い申し上げます。",
+        hb: "株式会社 東京サウンド・プロダクション\n松丸様\n\nいつもお世話になっております。\nFOSKIA image 後藤です。\n\n以下の日付でスタジオの空きをご確認いただけますでしょうか。",
+        fb: "お手数おかけしますが、\nご確認よろしくお願いいたします。",
+        hc: "塩沢様\n\nいつもお世話になっております。\nご確認誠にありがとうございました。",
+        bc: "{date}@{location} MA-{room} {time}\n{surname}様入り：{start+10}\n※{content}",
+        fc: "お手数ですがご確認よろしくお願いいたします。",
+        hd: "株式会社 東京サウンド・プロダクション\n松丸様\n\nいつもお世話になっております。\nFOSKIA image 後藤です。\n\nそれでは以下の時間でお願い出来ますでしょうか。",
+        bd: "{date}@{location} MA-{room} {time}\nナレーター入り：{start+10}",
+        fd: "お手数ですがご確認よろしくお願いいたします。",
+        selA: "デフォルト", selB: "デフォルト", selC: "デフォルト", selD: "デフォルト"
+      }
     };
-    const BUILTIN_VERSION = '2'; // BUILTIN_PRESETS を更新したらこの番号を上げる
+    const BUILTIN_VERSION = '3'; // BUILTIN_PRESETS を更新したらこの番号を上げる
 
     // 初回 or BUILTIN更新時、ローカルに無いプリセットを組み込みデフォルトで補完
     function applyBuiltinPresets(){
@@ -721,22 +732,25 @@ FOSKIA image 後藤です。</textarea>
     }
     migratePresetBodies();
 
-    // v1 で誤って焼き込まれた「進行中編集状態」(tmpl_current)を除去。
-    // BUILTIN v1 の宛名入り内容と完全一致する場合のみ削除（手入力データは保護）。
-    function cleanupV1BakedCurrent(){
-      const FLAG = '_v1current_cleaned';
+    // テンプレートを正しいデフォルト（BUILTIN）へ強制リセット（1回のみ）。
+    // 以前のバージョンで汎用文に戻ってしまったテンプレートを正しい内容に修復する。
+    function forceTemplateReset(){
+      const FLAG = '_tmpl_reset_v3';
       if(localStorage.getItem(FLAG)){ return; }
-      try {
-        const cur = JSON.parse(localStorage.getItem('tmpl_current'));
-        const BAKED_HA = "株式会社青二プロダクション\n塩沢様\n良川様\n山﨑様\n\nいつもお世話になっております。\nFOSKIA image 後藤です。";
-        const BAKED_HB = "株式会社 東京サウンド・プロダクション\n松丸様\n\nいつもお世話になっております。\nFOSKIA image 後藤です。\n\n以下の日付でスタジオの空きをご確認いただけますでしょうか。";
-        if(cur && cur.ha === BAKED_HA && cur.hb === BAKED_HB){
-          localStorage.removeItem('tmpl_current'); // デフォルトテンプレートに戻す
+      const tmplKeys = [
+        'tmpl_presets_a','tmpl_presets_b','tmpl_presets_c','tmpl_presets_d',
+        'tmpl_default_a','tmpl_default_b','tmpl_default_c','tmpl_default_d',
+        'tmpl_current'
+      ];
+      tmplKeys.forEach(key => {
+        if(BUILTIN_PRESETS[key] !== undefined){
+          const val = BUILTIN_PRESETS[key];
+          localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val));
         }
-      } catch(e){}
+      });
       localStorage.setItem(FLAG, '1');
     }
-    cleanupV1BakedCurrent();
+    forceTemplateReset();
 
     // 日本の祝日を自動計算（2025〜2040年）
     function _pad2(n){ return String(n).padStart(2,'0'); }
