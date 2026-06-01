@@ -1571,7 +1571,14 @@ FOSKIA image 後藤です。</textarea>
     }
 
     function getHistoryDisplayName(h){
-      const allContents = Object.values(h.contents || {}).filter(c => c && c.trim()).map(c => c.trim());
+      const allContents = [];
+      Object.values(h.contents || {}).forEach(c => {
+        if(Array.isArray(c)){
+          c.forEach(x => { if(typeof x === 'string' && x.trim()) allContents.push(x.trim()); });
+        } else if(typeof c === 'string' && c.trim()){
+          allContents.push(c.trim());
+        }
+      });
       const unique = [...new Set(allContents)];
       if(unique.length) return unique.join('、');
       if(h.contactName) return h.contactName + ' さま';
