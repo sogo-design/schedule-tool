@@ -839,7 +839,6 @@ FOSKIA image 後藤です。</textarea>
     let roomNumber = ''; // MAルーム番号（任意）— {room} に展開
     let locationName = ''; // 場所名（任意）— {location} に展開
     let taskDurations = {}; // { contentName: minutes } — タスクごとの内容別所要時間
-    let taskRooms = {}; // { contentName: roomNumber } — タスクごとの内容別ルーム番号
     let finalSlots = {}; // { contentKey: { date, start, end } } — STEP 3 で内容ごとに確定した日時
 
     function dateKey(y,m,d){ return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
@@ -1496,7 +1495,7 @@ FOSKIA image 後藤です。</textarea>
             const dur = ck ? getDurationFor(ck) : getDur();
             const endTime = dur > 0 ? addMin(startTime, dur) : (firstSlot && firstSlot.end ? firstSlot.end : '');
             // 入り終了（B）デフォルト = 入り開始(開始+10) + 30 = 開始+40
-            finalSlots[ck] = { date: k, start: startTime, end: endTime, narOut: addMin(startTime, 40), room: getRoomFor(ck) };
+            finalSlots[ck] = { date: k, start: startTime, end: endTime, narOut: addMin(startTime, 40), room: roomNumber };
             renderFinalPicker(); regenerateC(); regenerateD();
           });
           dateSection.appendChild(item);
@@ -1534,6 +1533,29 @@ FOSKIA image 後藤です。</textarea>
           }
           timeSection.appendChild(timeRow);
           groupDiv.appendChild(timeSection);
+
+          // ルーム番号セクション（日付選択済の場合）
+          const roomSection = document.createElement('div'); roomSection.className = 'final-section';
+          const roomLabel = document.createElement('div'); roomLabel.className = 'final-section-label'; roomLabel.textContent = 'ルーム番号';
+          roomSection.appendChild(roomLabel);
+          const roomSel = document.createElement('select'); roomSel.className = 'step2-dur-select';
+          const noneOpt = document.createElement('option'); noneOpt.value = ''; noneOpt.textContent = 'なし'; roomSel.appendChild(noneOpt);
+          const roomPresets = getRoomPresets();
+          const curRoom = (slot.room !== undefined && slot.room !== null) ? slot.room : (roomNumber || '');
+          roomPresets.forEach(r => {
+            const o = document.createElement('option'); o.value = r; o.textContent = 'MA-' + r;
+            roomSel.appendChild(o);
+          });
+          if(curRoom && !roomPresets.includes(curRoom)){
+            const o = document.createElement('option'); o.value = curRoom; o.textContent = 'MA-' + curRoom; roomSel.appendChild(o);
+          }
+          roomSel.value = curRoom;
+          roomSel.addEventListener('change', () => {
+            slot.room = roomSel.value;
+            regenerateC(); regenerateD();
+          });
+          roomSection.appendChild(roomSel);
+          groupDiv.appendChild(roomSection);
         }
 
         c.appendChild(groupDiv);
@@ -1730,7 +1752,6 @@ FOSKIA image 後藤です。</textarea>
         roomNumber,
         locationName,
         taskDurations,
-        taskRooms,
         finalSlots,
         step,
         duration: gv('s-duration'),
@@ -1759,7 +1780,6 @@ FOSKIA image 後藤です。</textarea>
       roomNumber = h.roomNumber || '';
       locationName = h.locationName || '';
       taskDurations = h.taskDurations || {};
-      taskRooms = h.taskRooms || {};
       // 履歴に保存されたルーム番号／場所がプリセットになければ追加
       if(roomNumber && !getRoomPresets().includes(roomNumber)){
         const arr = getRoomPresets(); arr.push(roomNumber); setRoomPresets(arr);
@@ -2153,12 +2173,6 @@ FOSKIA image 後藤です。</textarea>
       const d = taskDurations[contentName.trim()];
       return (typeof d === 'number' && d > 0) ? d : getDur();
     }
-    // 内容名からルーム番号を取得（タスクごとの設定があればそれを、なければグローバル roomNumber）
-    function getRoomFor(contentName){
-      if(!contentName) return roomNumber;
-      const c = contentName.trim();
-      return (c in taskRooms) ? taskRooms[c] : roomNumber;
-    }
 
     function refreshContentDatalist(){
       const list = document.getElementById('content-options');
@@ -2178,20 +2192,15 @@ FOSKIA image 後藤です。</textarea>
         getContentsListTrimmed(k).forEach(c => uniqueContents.add(c));
       });
       if(uniqueContents.size === 0) return; // 内容なし → 非表示
-      const title = document.createElement('div'); title.className = 'step2-dur-title'; title.textContent = '内容ごとの設定（所要時間・ルーム番号）';
+      const title = document.createElement('div'); title.className = 'step2-dur-title'; title.textContent = '所要時間（内容ごと）';
       container.appendChild(title);
       const STD_OPTS = [
         [30, '30 分'], [60, '1 時間'], [90, '1.5 時間'],
         [120, '2 時間'], [180, '3 時間']
       ];
-      const roomPresets = getRoomPresets();
       Array.from(uniqueContents).sort((a,b)=>a.localeCompare(b,'ja')).forEach(content => {
         const row = document.createElement('div'); row.className = 'step2-dur-row';
         const lbl = document.createElement('span'); lbl.className = 'step2-dur-content'; lbl.textContent = `「${content}」`;
-        row.appendChild(lbl);
-
-        // 所要時間
-        const durLabel = document.createElement('span'); durLabel.className = 'step2-mini-label'; durLabel.textContent = '所要';
         const sel = document.createElement('select'); sel.className = 'step2-dur-select';
         const curDur = (typeof taskDurations[content] === 'number' && taskDurations[content] > 0)
                         ? taskDurations[content] : (getDur() || 60);
@@ -2216,36 +2225,7 @@ FOSKIA image 後藤です。</textarea>
             }
           }
         });
-        row.appendChild(durLabel); row.appendChild(sel);
-
-        // ルーム番号
-        const roomLabel = document.createElement('span'); roomLabel.className = 'step2-mini-label'; roomLabel.textContent = 'ルーム';
-        const roomSel = document.createElement('select'); roomSel.className = 'step2-dur-select';
-        const noneOpt = document.createElement('option'); noneOpt.value = ''; noneOpt.textContent = 'なし'; roomSel.appendChild(noneOpt);
-        const curRoom = getRoomFor(content);
-        roomPresets.forEach(r => {
-          const o = document.createElement('option'); o.value = r; o.textContent = 'MA-' + r;
-          if(r === curRoom) o.selected = true;
-          roomSel.appendChild(o);
-        });
-        // プリセットにない値（手動設定）も選択肢に
-        if(curRoom && !roomPresets.includes(curRoom)){
-          const o = document.createElement('option'); o.value = curRoom; o.textContent = 'MA-' + curRoom; o.selected = true;
-          roomSel.appendChild(o);
-        }
-        roomSel.addEventListener('change', () => {
-          taskRooms[content] = roomSel.value;
-          saveSession();
-          const slot = finalSlots[content];
-          if(slot){ slot.room = roomSel.value; }
-          if(document.getElementById('step3').style.display === 'block'){
-            renderFinalPicker(); regenerateC(); regenerateD();
-          } else {
-            regenerateC(); regenerateD();
-          }
-        });
-        row.appendChild(roomLabel); row.appendChild(roomSel);
-
+        row.appendChild(lbl); row.appendChild(sel);
         container.appendChild(row);
       });
     }
@@ -2556,7 +2536,6 @@ FOSKIA image 後藤です。</textarea>
       roomNumber = '';
       locationName = '';
       taskDurations = {};
-      taskRooms = {};
       finalSlots = {};
       refreshContactList();
       refreshRoomList();
