@@ -1009,6 +1009,30 @@ FOSKIA image 後藤です。</textarea>
       if(!p) return '';
       return p.multi ? `上記日程のどこか、${p.phrase}` : `上記日程のどこか${p.phrase}`;
     }
+    // 内容文（所要時間を併記）：「内容は…が「A」（1時間）で、…が「B」（2時間）です。」
+    function buildContentSentence(keys){
+      const withC = keys.filter(k => contents[k] && contents[k].trim());
+      if(withC.length === 0) return '';
+      const allSame = withC.every(k => contents[k].trim() === contents[withC[0]].trim());
+      const cdur = (name) => {
+        const d = getDurationFor(name);
+        return d > 0 ? `（${fmtDur(d)}）` : '';
+      };
+      if(allSame){
+        const cname = contents[withC[0]].trim();
+        return `内容は「${cname}」${cdur(cname)}です。`;
+      }
+      const parts = withC.map(k => {
+        const [y,m,d] = k.split('-').map(Number);
+        const cname = contents[k].trim();
+        return `${m}月${d}日が「${cname}」${cdur(cname)}`;
+      });
+      const last = parts[parts.length-1];
+      const head = parts.slice(0,-1);
+      return head.length
+        ? `内容は${head.join('で、')}で、${last}です。`
+        : `内容は${last}です。`;
+    }
 
     // ── Generate B（日付＋所要時間 + 内容）──────────
     function regenerateB(){
@@ -1028,6 +1052,9 @@ FOSKIA image 後藤です。</textarea>
       const dur = getDur();
       const lines = [hdr.replace(/\{subject\}/g,subj), ''];
 
+      const withC = keys.filter(k => contents[k] && contents[k].trim());
+      const hasContent = withC.length > 0;
+
       if(anySlot){
         // 番号付きリスト：各日付＋選択時間（時間なしの日は日付のみ）
         keys.forEach((k, i)=>{
@@ -1040,11 +1067,13 @@ FOSKIA image 後藤です。</textarea>
             lines.push(`${num}  ${fmtDate(k)}`);
           }
         });
-        // 「上記日程のどこか[所要時間]ほど」— 内容ごとに所要時間が異なる場合は分けて表示
-        const durSentence = buildDurationSentence(keys);
-        if(durSentence) lines.push('', durSentence);
+        // 内容なしの場合のみ独立した「上記日程のどこか…ほど」を追加
+        if(!hasContent){
+          const durSentence = buildDurationSentence(keys);
+          if(durSentence) lines.push('', durSentence);
+        }
       } else {
-        // 時間設定なし → compact 表示（内容別所要時間に対応）
+        // 時間設定なし → compact 表示
         const dateLabels=[]; let prevMonth=null;
         keys.forEach(k=>{
           const [y,m,d]=k.split('-').map(Number);
@@ -1054,36 +1083,24 @@ FOSKIA image 後藤です。</textarea>
           prevMonth=m;
         });
         const datesStr = dateLabels.join('と');
-        const dPhrase = buildDurationPhrase(keys);
-        let dateDurLine = datesStr;
-        if(dPhrase){
-          const connector = keys.length > 1 ? 'どこか' : 'で';
-          const sep = dPhrase.multi ? '、' : '';
-          dateDurLine = `${datesStr}${connector}${sep}${dPhrase.phrase}`;
+        if(!hasContent){
+          // 内容なし → 従来通り日付＋所要時間を1行に
+          const dPhrase = buildDurationPhrase(keys);
+          let dateDurLine = datesStr;
+          if(dPhrase){
+            const connector = keys.length > 1 ? 'どこか' : 'で';
+            dateDurLine = `${datesStr}${connector}${dPhrase.phrase}`;
+          }
+          lines.push(dateDurLine);
+        } else {
+          // 内容あり → 日付一覧のみ（所要時間は内容文に併記）
+          lines.push(datesStr);
         }
-        lines.push(dateDurLine);
       }
 
-      // 内容文（STEP 1 と同じロジック）
-      const withC = keys.filter(k => contents[k] && contents[k].trim());
-      if(withC.length){
-        const allSame = withC.every(k => contents[k].trim() === contents[withC[0]].trim());
-        let contentLine;
-        if(allSame){
-          contentLine = `内容は「${contents[withC[0]].trim()}」です。`;
-        } else {
-          const parts = withC.map(k => {
-            const [y,m,d] = k.split('-').map(Number);
-            return `${m}月${d}日が「${contents[k].trim()}」`;
-          });
-          const last = parts[parts.length-1];
-          const head = parts.slice(0,-1);
-          contentLine = head.length
-            ? `内容は${head.join('で、')}で、${last}です。`
-            : `内容は${last}です。`;
-        }
-        lines.push('', contentLine);
-      }
+      // 内容文（所要時間を併記）
+      const cs = buildContentSentence(keys);
+      if(cs) lines.push('', cs);
 
       lines.push('', ftr);
       out.value = lines.join('\n');
