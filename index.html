@@ -1000,8 +1000,8 @@ FOSKIA image 後藤です。</textarea>
       }
       const parts = Object.entries(contentDurs)
         .filter(([_, d]) => d > 0)
-        .map(([name, d]) => `「${name}」は${fmtDur(d)}`);
-      return { multi: true, phrase: `${parts.join('、')}ほど` };
+        .map(([name, d]) => `「${name}」は${fmtDur(d)}ほど`);
+      return { multi: true, phrase: parts.join('、') };
     }
     // 「上記日程のどこか…ほど」用ラッパー（番号付きリスト形式の後に追加）
     function buildDurationSentence(keys){
@@ -1016,7 +1016,7 @@ FOSKIA image 後藤です。</textarea>
       const allSame = withC.every(k => contents[k].trim() === contents[withC[0]].trim());
       const cdur = (name) => {
         const d = getDurationFor(name);
-        return d > 0 ? `（${fmtDur(d)}）` : '';
+        return d > 0 ? `（${fmtDur(d)}ほど）` : '';
       };
       if(allSame){
         const cname = contents[withC[0]].trim();
