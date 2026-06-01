@@ -271,6 +271,16 @@
     .final-group { margin-bottom: 20px; padding-bottom: 18px; border-bottom: 1px dashed var(--border); }
     .final-group:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
     .final-group-title { font-size: .82rem; font-weight: 700; color: var(--accent); margin-bottom: 12px; padding: 6px 12px; background: var(--accent-glow); border-radius: 6px; display: inline-block; }
+
+    /* ── 入り終了時刻（出る時間）セクション ── */
+    .narout-section { margin: 12px 0; padding: 12px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: 9px; }
+    .narout-section:empty { display: none; }
+    .narout-title { font-size: .68rem; color: var(--text3); letter-spacing: .08em; font-weight: 700; text-transform: uppercase; margin-bottom: 9px; }
+    .narout-row { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; flex-wrap: wrap; }
+    .narout-row:last-child { margin-bottom: 0; }
+    .narout-label { font-size: .8rem; color: var(--text2); font-weight: 600; min-width: 110px; flex-shrink: 0; }
+    .narout-intime { font-size: .8rem; color: var(--text2); }
+    .narout-sep { color: var(--text3); font-size: .8rem; }
   </style>
 </head>
 <body class="notranslate">
@@ -500,6 +510,7 @@
             <button class="copy-btn" id="copy-btn-c">コピー</button>
           </div>
           <textarea class="output-textarea" id="output-c" placeholder="決定した日時を選択してください"></textarea>
+          <div class="narout-section" id="narout-section"></div>
           <button class="tmpl-toggle" id="tmpl-toggle-c">
             <span class="arrow">▶</span>テンプレートを編集
           </button>
@@ -519,7 +530,7 @@ FOSKIA image 後藤です。</textarea>
             </div>
             <div class="field">
               <label>本文（決定日程ごとに繰り返し表示）</label>
-              <div class="tmpl-hint">置換タグ：<b>{date}</b>=日付　<b>{time}</b>=時間　<b>{start+10}</b>=開始＋10分　<b>{location}</b>=場所　<b>{room}</b>=ルーム番号　<b>{surname}</b>=確認者の苗字　<b>{content}</b>=その日の内容</div>
+              <div class="tmpl-hint">置換タグ：<b>{date}</b>=日付　<b>{time}</b>=時間　<b>{start+10}</b>=開始＋10分　<b>{narout}</b>=入り終了時刻　<b>{location}</b>=場所　<b>{room}</b>=ルーム番号　<b>{surname}</b>=確認者の苗字　<b>{content}</b>=その日の内容</div>
               <textarea id="t-body-c" rows="4">{date}@{location} MA-{room} {time}
 {surname}様入り：{start+10}
 ※{content}</textarea>
@@ -556,7 +567,7 @@ FOSKIA image 後藤です。</textarea>
             </div>
             <div class="field">
               <label>本文（決定日程ごとに繰り返し表示）</label>
-              <div class="tmpl-hint">置換タグ：<b>{date}</b>=日付　<b>{time}</b>=時間　<b>{start+10}</b>=開始＋10分　<b>{location}</b>=場所　<b>{room}</b>=ルーム番号</div>
+              <div class="tmpl-hint">置換タグ：<b>{date}</b>=日付　<b>{time}</b>=時間　<b>{start+10}</b>=開始＋10分　<b>{narout}</b>=入り終了時刻　<b>{location}</b>=場所　<b>{room}</b>=ルーム番号</div>
               <textarea id="t-body-d" rows="3">{date}@{location} MA-{room} {time}
 ナレーター入り：{start+10}</textarea>
             </div>
@@ -661,13 +672,13 @@ FOSKIA image 後藤です。</textarea>
       tmpl_presets_c: [{
         name: "デフォルト",
         header: "塩沢様\n\nいつもお世話になっております。\nご確認誠にありがとうございました。",
-        body: "{date}@{location} MA-{room} {time}\n{surname}様入り：{start+10}\n※{content}",
+        body: "{date}@{location} MA-{room} {time}\n{surname}様入り：{start+10}〜{narout}\n※{content}",
         footer: "お手数ですがご確認よろしくお願いいたします。"
       }],
       tmpl_presets_d: [{
         name: "デフォルト",
         header: "株式会社 東京サウンド・プロダクション\n松丸様\n\nいつもお世話になっております。\nFOSKIA image 後藤です。\n\nそれでは以下の時間でお願い出来ますでしょうか。",
-        body: "{date}@{location} MA-{room} {time}\nナレーター入り：{start+10}",
+        body: "{date}@{location} MA-{room} {time}\nナレーター入り：{start+10}〜{narout}",
         footer: "お手数ですがご確認よろしくお願いいたします。"
       }],
       tmpl_current: {
@@ -676,15 +687,15 @@ FOSKIA image 後藤です。</textarea>
         hb: "株式会社 東京サウンド・プロダクション\n松丸様\n\nいつもお世話になっております。\nFOSKIA image 後藤です。\n\n以下の日付でスタジオの空きをご確認いただけますでしょうか。",
         fb: "お手数おかけしますが、\nご確認よろしくお願いいたします。",
         hc: "塩沢様\n\nいつもお世話になっております。\nご確認誠にありがとうございました。",
-        bc: "{date}@{location} MA-{room} {time}\n{surname}様入り：{start+10}\n※{content}",
+        bc: "{date}@{location} MA-{room} {time}\n{surname}様入り：{start+10}〜{narout}\n※{content}",
         fc: "お手数ですがご確認よろしくお願いいたします。",
         hd: "株式会社 東京サウンド・プロダクション\n松丸様\n\nいつもお世話になっております。\nFOSKIA image 後藤です。\n\nそれでは以下の時間でお願い出来ますでしょうか。",
-        bd: "{date}@{location} MA-{room} {time}\nナレーター入り：{start+10}",
+        bd: "{date}@{location} MA-{room} {time}\nナレーター入り：{start+10}〜{narout}",
         fd: "お手数ですがご確認よろしくお願いいたします。",
         selA: "デフォルト", selB: "デフォルト", selC: "デフォルト", selD: "デフォルト"
       }
     };
-    const BUILTIN_VERSION = '3'; // BUILTIN_PRESETS を更新したらこの番号を上げる
+    const BUILTIN_VERSION = '4'; // BUILTIN_PRESETS を更新したらこの番号を上げる
 
     // 初回 or BUILTIN更新時、ローカルに無いプリセットを組み込みデフォルトで補完
     function applyBuiltinPresets(){
@@ -735,7 +746,7 @@ FOSKIA image 後藤です。</textarea>
     // テンプレートを正しいデフォルト（BUILTIN）へ強制リセット（1回のみ）。
     // 以前のバージョンで汎用文に戻ってしまったテンプレートを正しい内容に修復する。
     function forceTemplateReset(){
-      const FLAG = '_tmpl_reset_v3';
+      const FLAG = '_tmpl_reset_v4';
       if(localStorage.getItem(FLAG)){ return; }
       const tmplKeys = [
         'tmpl_presets_a','tmpl_presets_b','tmpl_presets_c','tmpl_presets_d',
@@ -856,7 +867,8 @@ FOSKIA image 後藤です。</textarea>
         .replace(/\{room\}/g, roomNumber || '')
         .replace(/\{location\}/g, locationName || '')
         .replace(/\{surname\}/g, surname)
-        .replace(/\{content\}/g, slotContent);
+        .replace(/\{content\}/g, slotContent)
+        .replace(/\{narout\}/g, safe.narOut || '');
       out = out.replace(/\{(start|end)([+\-＋－])(\d+)\}/g, (m, base, sign, n) => {
         const baseTime = base === 'start' ? startTime : endTime;
         if(!baseTime) return '';
@@ -867,7 +879,7 @@ FOSKIA image 後藤です。</textarea>
       return out;
     }
     function hasPlaceholders(text){
-      return /\{(date|time|start|end|room|location|surname|content)([+\-＋－]\d+)?\}/.test(text || '');
+      return /\{(date|time|start|end|room|location|surname|content|narout)([+\-＋－]\d+)?\}/.test(text || '');
     }
     function getDur(){ return parseInt(document.getElementById('s-duration').value); }
 
@@ -1111,7 +1123,7 @@ FOSKIA image 後藤です。</textarea>
       // 確認者の文
       if(contactName && contactName.trim()){
         lines.push('');
-        lines.push(`【 ${contactName.trim()}さま】のスケジュールをご確認いただけますでしょうか。`);
+        lines.push(`【${contactName.trim()}さま】のスケジュールをご確認いただけますでしょうか。`);
       }
       // 内容文（候補日に「内容」が入力されていれば自動挿入。内容ごとに日付をまとめる）
       const cgroups = groupDatesByContent(keys);
@@ -1477,7 +1489,8 @@ FOSKIA image 後藤です。</textarea>
             const startTime = firstSlot ? firstSlot.start : '10:00';
             const dur = ck ? getDurationFor(ck) : getDur();
             const endTime = dur > 0 ? addMin(startTime, dur) : (firstSlot && firstSlot.end ? firstSlot.end : '');
-            finalSlots[ck] = { date: k, start: startTime, end: endTime };
+            // 入り終了（B）デフォルト = 入り開始(開始+10) + 30 = 開始+40
+            finalSlots[ck] = { date: k, start: startTime, end: endTime, narOut: addMin(startTime, 40) };
             renderFinalPicker(); regenerateC(); regenerateD();
           });
           dateSection.appendChild(item);
@@ -1497,6 +1510,8 @@ FOSKIA image 後藤です。</textarea>
             slot.start = sSel.getValue();
             const dur = ck ? getDurationFor(ck) : getDur();
             if(dur > 0 && slot.start){ slot.end = addMin(slot.start, dur); eSel.setValue(slot.end); }
+            if(slot.start){ slot.narOut = addMin(slot.start, 40); } // 入り終了を再計算
+            renderNarOutSection();
             regenerateC(); regenerateD();
           });
           eSel.addChangeListener(() => {
@@ -1516,6 +1531,39 @@ FOSKIA image 後藤です。</textarea>
         }
 
         c.appendChild(groupDiv);
+      });
+      renderNarOutSection();
+    }
+
+    // 入り終了時刻（出る時間 B）の選択セクション
+    function renderNarOutSection(){
+      const container = document.getElementById('narout-section');
+      if(!container) return;
+      container.innerHTML = '';
+      const groups = getContentGroups();
+      const contentKeys = sortedContentKeys(groups);
+      const filled = contentKeys.filter(ck => finalSlots[ck] && finalSlots[ck].start);
+      if(filled.length === 0) return;
+      const title = document.createElement('div'); title.className = 'narout-title'; title.textContent = '入り終了時刻（出る時間）';
+      container.appendChild(title);
+      const showLabel = filled.length > 1;
+      filled.forEach(ck => {
+        const slot = finalSlots[ck];
+        if(!slot.narOut) slot.narOut = addMin(slot.start, 40);
+        const row = document.createElement('div'); row.className = 'narout-row';
+        if(showLabel){
+          const lbl = document.createElement('span'); lbl.className = 'narout-label';
+          lbl.textContent = ck ? `「${ck}」` : '（指定なし）';
+          row.appendChild(lbl);
+        }
+        // 入り開始（参考表示）〜 入り終了（選択）
+        const inStart = document.createElement('span'); inStart.className = 'narout-intime';
+        inStart.textContent = '入り ' + addMin(slot.start, 10);
+        const sep = document.createElement('span'); sep.className = 'narout-sep'; sep.textContent = '〜';
+        const picker = makeTimeSel(slot.narOut);
+        picker.addChangeListener(() => { slot.narOut = picker.getValue(); regenerateC(); regenerateD(); });
+        row.append(inStart, sep, picker);
+        container.appendChild(row);
       });
     }
 
