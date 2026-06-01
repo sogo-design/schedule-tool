@@ -787,7 +787,11 @@ FOSKIA image 後藤です。</textarea>
       const cIn=document.createElement('input'); cIn.type='text'; cIn.className='date-content-input'; cIn.placeholder='内容（任意）';
       cIn.setAttribute('list','content-options');
       cIn.value = contents[k] || '';
-      cIn.addEventListener('input',()=>{ contents[k]=cIn.value; regenerateA(); regenerateC(); });
+      cIn.addEventListener('input',()=>{
+        contents[k]=cIn.value;
+        regenerateA(); regenerateB(); regenerateC();
+        if(document.getElementById('step2').style.display==='block') renderStep2Durations();
+      });
       left.append(lbl, cIn);
       const actions=document.createElement('div'); actions.className='date-row-actions';
       const addTime=document.createElement('button'); addTime.className='add-time-btn'; addTime.textContent='+ 時間も追加';
@@ -813,7 +817,11 @@ FOSKIA image 後藤です。</textarea>
       const cIn=document.createElement('input'); cIn.type='text'; cIn.className='date-content-input'; cIn.placeholder='内容（任意）';
       cIn.setAttribute('list','content-options');
       cIn.value = contents[k] || '';
-      cIn.addEventListener('input',()=>{ contents[k]=cIn.value; regenerateA(); regenerateC(); });
+      cIn.addEventListener('input',()=>{
+        contents[k]=cIn.value;
+        regenerateA(); regenerateB(); regenerateC();
+        if(document.getElementById('step2').style.display==='block') renderStep2Durations();
+      });
       left.append(lbl, cIn);
       const rm=document.createElement('button'); rm.className='remove-date'; rm.textContent='×';
       rm.title='この日を候補から削除';
@@ -1807,11 +1815,16 @@ FOSKIA image 後藤です。</textarea>
         const idx = arr.indexOf(cur);
         if(idx >= 0) arr[idx] = newVal;
         setContentPresetsList(arr);
-        // taskDurations のキーも移行
+        // taskDurations のキー移行
         if(cur in taskDurations){ taskDurations[newVal] = taskDurations[cur]; delete taskDurations[cur]; }
+        // 現在タスクの contents 内の同名値を更新
+        Object.keys(contents).forEach(k => { if(contents[k] === cur) contents[k] = newVal; });
+        // finalSlots のキー移行
+        if(cur in finalSlots){ finalSlots[newVal] = finalSlots[cur]; delete finalSlots[cur]; }
         if(getContentDefault() === cur) setContentDefaultVal(newVal);
         refreshContentSelect(); refreshContentDatalist();
-        regenerateB();
+        renderDateList(); renderTimeEditor();
+        regenerateA(); regenerateB(); regenerateC(); regenerateD();
       });
       document.getElementById('content-default').addEventListener('click', () => {
         const cur = document.getElementById('content-preset-sel').value;
