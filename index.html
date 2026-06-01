@@ -140,7 +140,9 @@
     .ts-h-list { overflow-y: auto; max-height: 180px; scrollbar-width: thin; scrollbar-color: var(--border2) transparent; min-width: 52px; }
     .ts-h-list::-webkit-scrollbar { width: 4px; }
     .ts-h-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
-    .ts-m-list { border-left: 1px solid var(--border); min-width: 52px; }
+    .ts-m-list { border-left: 1px solid var(--border); min-width: 52px; max-height: 180px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }
+    .ts-m-list::-webkit-scrollbar { width: 4px; }
+    .ts-m-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
     .ts-h-opt, .ts-m-opt { display: block; width: 100%; background: none; border: none; color: var(--text2); font-size: .8rem; font-family: inherit; padding: 7px 0; cursor: pointer; text-align: center; transition: background .08s, color .08s; }
     .ts-h-opt:hover, .ts-m-opt:hover { background: var(--surface2); color: var(--text); }
     .ts-h-opt.sel, .ts-m-opt.sel { color: var(--accent); font-weight: 700; background: var(--accent-glow); }
@@ -884,7 +886,8 @@ FOSKIA image 後藤です。</textarea>
     function getDur(){ return parseInt(document.getElementById('s-duration').value); }
 
     // ── TimeSel ──────────────────────────────────────
-    function makeTimeSel(timeStr) {
+    function makeTimeSel(timeStr, minuteStep) {
+      const stepMin = (minuteStep && minuteStep > 0) ? minuteStep : 15;
       let h = 10, m = 0, isSet = false;
       if(timeStr && timeStr.includes(':')){ [h, m] = timeStr.split(':').map(Number); isSet = true; }
       const listeners = []; const fire = () => listeners.forEach(fn=>fn());
@@ -907,7 +910,8 @@ FOSKIA image 後藤です。</textarea>
         hList.appendChild(o);
       }
       const mList=document.createElement('div'); mList.className='ts-m-list';
-      [0,15,30,45].forEach(mi=>{
+      const minuteVals=[]; for(let mi=0; mi<60; mi+=stepMin) minuteVals.push(mi);
+      minuteVals.forEach(mi=>{
         const o=document.createElement('button'); o.type='button'; o.className='ts-m-opt'; o.dataset.v=mi;
         o.textContent=String(mi).padStart(2,'0');
         o.addEventListener('mousedown',e=>{e.preventDefault();m=mi;isSet=true;refreshDisplay();fire();closePicker();});
@@ -1560,7 +1564,7 @@ FOSKIA image 後藤です。</textarea>
         const inStart = document.createElement('span'); inStart.className = 'narout-intime';
         inStart.textContent = '入り ' + addMin(slot.start, 10);
         const sep = document.createElement('span'); sep.className = 'narout-sep'; sep.textContent = '〜';
-        const picker = makeTimeSel(slot.narOut);
+        const picker = makeTimeSel(slot.narOut, 5);
         picker.addChangeListener(() => { slot.narOut = picker.getValue(); regenerateC(); regenerateD(); });
         row.append(inStart, sep, picker);
         container.appendChild(row);
