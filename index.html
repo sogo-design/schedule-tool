@@ -980,32 +980,34 @@ FOSKIA image 後藤です。</textarea>
       return m===0 ? `${h}時間` : `${h}時間${m}分`;
     }
 
-    // 所要時間文を生成（内容ごとに異なる場合は分けて表示／同じならまとめる）
-    function buildDurationSentence(keys){
+    // 所要時間部分（"ほど"までの本体）を生成。内容ごとに異なれば分け、同じならまとめる
+    function buildDurationPhrase(keys){
       const datesWithContent = keys.filter(k => contents[k] && contents[k].trim());
       if(datesWithContent.length === 0){
-        // 内容なし → 全体に対する s-duration の所要時間
         const dur = getDur();
-        return dur > 0 ? `上記日程のどこか${fmtDur(dur)}ほど` : '';
+        return dur > 0 ? { multi: false, phrase: `${fmtDur(dur)}ほど` } : null;
       }
-      // 内容ごとに所要時間を集計
       const contentDurs = {};
       datesWithContent.forEach(k => {
         const c = contents[k].trim();
         if(!(c in contentDurs)) contentDurs[c] = getDurationFor(c);
       });
       const durValues = Object.values(contentDurs).filter(d => d > 0);
-      if(durValues.length === 0) return '';
+      if(durValues.length === 0) return null;
       const uniqueDurs = [...new Set(durValues)];
       if(uniqueDurs.length === 1){
-        // 全部同じ所要時間 → まとめて表示
-        return `上記日程のどこか${fmtDur(uniqueDurs[0])}ほど`;
+        return { multi: false, phrase: `${fmtDur(uniqueDurs[0])}ほど` };
       }
-      // 内容ごとに分けて表示
       const parts = Object.entries(contentDurs)
         .filter(([_, d]) => d > 0)
         .map(([name, d]) => `「${name}」は${fmtDur(d)}`);
-      return `上記日程のどこか、${parts.join('、')}ほど`;
+      return { multi: true, phrase: `${parts.join('、')}ほど` };
+    }
+    // 「上記日程のどこか…ほど」用ラッパー（番号付きリスト形式の後に追加）
+    function buildDurationSentence(keys){
+      const p = buildDurationPhrase(keys);
+      if(!p) return '';
+      return p.multi ? `上記日程のどこか、${p.phrase}` : `上記日程のどこか${p.phrase}`;
     }
 
     // ── Generate B（日付＋所要時間 + 内容）──────────
@@ -1042,7 +1044,7 @@ FOSKIA image 後藤です。</textarea>
         const durSentence = buildDurationSentence(keys);
         if(durSentence) lines.push('', durSentence);
       } else {
-        // 時間設定なし → 従来通り compact 表示
+        // 時間設定なし → compact 表示（内容別所要時間に対応）
         const dateLabels=[]; let prevMonth=null;
         keys.forEach(k=>{
           const [y,m,d]=k.split('-').map(Number);
@@ -1052,11 +1054,13 @@ FOSKIA image 後藤です。</textarea>
           prevMonth=m;
         });
         const datesStr = dateLabels.join('と');
-        const durStr = dur>0 ? `${fmtDur(dur)}ほど` : '';
-        let dateDurLine;
-        if(!durStr) dateDurLine = datesStr;
-        else if(keys.length>1) dateDurLine = `${datesStr}どこか${durStr}`;
-        else dateDurLine = `${datesStr}で${durStr}`;
+        const dPhrase = buildDurationPhrase(keys);
+        let dateDurLine = datesStr;
+        if(dPhrase){
+          const connector = keys.length > 1 ? 'どこか' : 'で';
+          const sep = dPhrase.multi ? '、' : '';
+          dateDurLine = `${datesStr}${connector}${sep}${dPhrase.phrase}`;
+        }
         lines.push(dateDurLine);
       }
 
