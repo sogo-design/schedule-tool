@@ -330,6 +330,18 @@
   <datalist id="content-options"></datalist>
 
   <div class="content-bar">
+    <label>場所（任意）</label>
+    <select class="preset-sel" id="loc-sel">
+      <option value="">― なし ―</option>
+    </select>
+    <button class="preset-btn add" id="loc-add">+ 追加</button>
+    <button class="preset-btn" id="loc-rename">改名</button>
+    <button class="preset-btn icon star" id="loc-default" title="デフォルトに設定">☆</button>
+    <button class="preset-btn del" id="loc-del">削除</button>
+    <span class="contact-hint">確定文面の <code>{location}</code> タグに挿入</span>
+  </div>
+
+  <div class="content-bar">
     <label>MAルーム番号（任意）</label>
     <select class="preset-sel" id="room-sel">
       <option value="">― なし ―</option>
@@ -338,7 +350,7 @@
     <button class="preset-btn" id="room-rename">改名</button>
     <button class="preset-btn icon star" id="room-default" title="デフォルトに設定">☆</button>
     <button class="preset-btn del" id="room-del">削除</button>
-    <span class="contact-hint">B社向け確定文面の <code>{room}</code> タグに挿入</span>
+    <span class="contact-hint">確定文面の <code>{room}</code> タグに挿入</span>
   </div>
 
   <!-- ══ STEP 1：A社へ（日程のみ）══ -->
@@ -488,8 +500,8 @@ FOSKIA image 後藤です。</textarea>
             </div>
             <div class="field">
               <label>本文（決定日程ごとに繰り返し表示）</label>
-              <div class="tmpl-hint">置換タグ：<b>{date}</b>=日付　<b>{time}</b>=時間　<b>{start+10}</b>=開始＋10分　<b>{room}</b>=ルーム番号　<b>{surname}</b>=確認者の苗字　<b>{content}</b>=その日の内容</div>
-              <textarea id="t-body-c" rows="4">{date}@EXタワープラスビル MA-{room} {time}
+              <div class="tmpl-hint">置換タグ：<b>{date}</b>=日付　<b>{time}</b>=時間　<b>{start+10}</b>=開始＋10分　<b>{location}</b>=場所　<b>{room}</b>=ルーム番号　<b>{surname}</b>=確認者の苗字　<b>{content}</b>=その日の内容</div>
+              <textarea id="t-body-c" rows="4">{date}@{location} MA-{room} {time}
 {surname}様入り：{start+10}
 ※{content}</textarea>
             </div>
@@ -525,8 +537,8 @@ FOSKIA image 後藤です。</textarea>
             </div>
             <div class="field">
               <label>本文（決定日程ごとに繰り返し表示）</label>
-              <div class="tmpl-hint">置換タグ：<b>{date}</b>=日付　<b>{time}</b>=時間　<b>{start+10}</b>=開始＋10分　<b>{room}</b>=ルーム番号</div>
-              <textarea id="t-body-d" rows="3">{date}@EXタワープラスビル MA-{room} {time}
+              <div class="tmpl-hint">置換タグ：<b>{date}</b>=日付　<b>{time}</b>=時間　<b>{start+10}</b>=開始＋10分　<b>{location}</b>=場所　<b>{room}</b>=ルーム番号</div>
+              <textarea id="t-body-d" rows="3">{date}@{location} MA-{room} {time}
 ナレーター入り：{start+10}</textarea>
             </div>
             <div class="field">
@@ -630,6 +642,7 @@ FOSKIA image 後藤です。</textarea>
     let contents = {}; // { dateKey: "内容" } — 各候補日の内容（任意）
     let contactName = ''; // 確認者の名前（任意）
     let roomNumber = ''; // MAルーム番号（任意）— {room} に展開
+    let locationName = ''; // 場所名（任意）— {location} に展開
     let taskDurations = {}; // { contentName: minutes } — タスクごとの内容別所要時間
     let finalSlots = {}; // { contentKey: { date, start, end } } — STEP 3 で内容ごとに確定した日時
 
@@ -660,6 +673,7 @@ FOSKIA image 後藤です。</textarea>
         .replace(/\{start\}/g, startTime)
         .replace(/\{end\}/g, endTime)
         .replace(/\{room\}/g, roomNumber || '')
+        .replace(/\{location\}/g, locationName || '')
         .replace(/\{surname\}/g, surname)
         .replace(/\{content\}/g, slotContent);
       out = out.replace(/\{(start|end)([+\-＋－])(\d+)\}/g, (m, base, sign, n) => {
@@ -672,7 +686,7 @@ FOSKIA image 後藤です。</textarea>
       return out;
     }
     function hasPlaceholders(text){
-      return /\{(date|time|start|end|room|surname|content)([+\-＋－]\d+)?\}/.test(text || '');
+      return /\{(date|time|start|end|room|location|surname|content)([+\-＋－]\d+)?\}/.test(text || '');
     }
     function getDur(){ return parseInt(document.getElementById('s-duration').value); }
 
@@ -1479,6 +1493,7 @@ FOSKIA image 後藤です。</textarea>
         contents,
         contactName,
         roomNumber,
+        locationName,
         taskDurations,
         finalSlots,
         step,
@@ -1506,12 +1521,17 @@ FOSKIA image 後藤です。</textarea>
       });
       contactName = h.contactName || '';
       roomNumber = h.roomNumber || '';
+      locationName = h.locationName || '';
       taskDurations = h.taskDurations || {};
-      // 履歴に保存されたルーム番号がプリセットになければ追加
+      // 履歴に保存されたルーム番号／場所がプリセットになければ追加
       if(roomNumber && !getRoomPresets().includes(roomNumber)){
         const arr = getRoomPresets(); arr.push(roomNumber); setRoomPresets(arr);
       }
+      if(locationName && !getLocationPresets().includes(locationName)){
+        const arr = getLocationPresets(); arr.push(locationName); setLocationPresets(arr);
+      }
       refreshRoomList();
+      refreshLocationList();
       // 旧データ互換：finalSlot(単数) → finalSlots(マップ)
       if(h.finalSlots){
         finalSlots = h.finalSlots;
@@ -1777,6 +1797,89 @@ FOSKIA image 後藤です。</textarea>
       });
     }
 
+    // ── 場所プリセット ───────────────────────────────
+    function getLocationPresets(){ try { return (JSON.parse(localStorage.getItem('location_presets'))||[]).sort((a,b)=>a.localeCompare(b,'ja')); } catch(e){ return []; } }
+    function setLocationPresets(arr){ try { localStorage.setItem('location_presets', JSON.stringify(arr)); } catch(e){} }
+    function getLocationDefault(){ return localStorage.getItem('location_default') || ''; }
+    function setLocationDefaultVal(val){ if(val) localStorage.setItem('location_default', val); else localStorage.removeItem('location_default'); }
+    function refreshLocationList(){
+      const sel = document.getElementById('loc-sel');
+      const def = getLocationDefault();
+      sel.innerHTML = '<option value="">― なし ―</option>';
+      getLocationPresets().forEach(v => {
+        const o = document.createElement('option');
+        o.value = v; o.textContent = (v === def ? '★ ' : '') + v;
+        sel.appendChild(o);
+      });
+      sel.value = (locationName && getLocationPresets().includes(locationName)) ? locationName : '';
+      updateLocationBtnState();
+      updateLocationDefaultBtn();
+    }
+    function updateLocationBtnState(){
+      const sel = document.getElementById('loc-sel');
+      const has = sel.value !== '';
+      document.getElementById('loc-rename').disabled = !has;
+      document.getElementById('loc-del').disabled = !has;
+    }
+    function updateLocationDefaultBtn(){
+      const sel = document.getElementById('loc-sel');
+      const btn = document.getElementById('loc-default');
+      const cur = sel.value;
+      if(!cur){ btn.disabled = true; btn.textContent = '☆'; btn.classList.remove('on'); btn.title = 'デフォルトに設定'; return; }
+      btn.disabled = false;
+      const isDef = cur === getLocationDefault();
+      btn.textContent = isDef ? '★' : '☆';
+      btn.classList.toggle('on', isDef);
+      btn.title = isDef ? 'デフォルトを解除' : 'デフォルトに設定';
+    }
+    function setupLocation(){
+      refreshLocationList();
+      document.getElementById('loc-sel').addEventListener('change', e => {
+        locationName = e.target.value;
+        updateLocationBtnState(); updateLocationDefaultBtn();
+        regenerateC(); regenerateD();
+      });
+      document.getElementById('loc-add').addEventListener('click', () => {
+        const val = (prompt('場所を入力してください（例：EXタワープラスビル）')||'').trim();
+        if(!val) return;
+        const arr = getLocationPresets();
+        if(arr.includes(val)){ alert('同じ場所が既に保存されています'); locationName = val; refreshLocationList(); regenerateC(); regenerateD(); return; }
+        arr.push(val); setLocationPresets(arr);
+        locationName = val; refreshLocationList(); regenerateC(); regenerateD();
+      });
+      document.getElementById('loc-rename').addEventListener('click', () => {
+        const cur = document.getElementById('loc-sel').value;
+        if(!cur){ alert('改名する場所を選択してください'); return; }
+        const newVal = (prompt('新しい場所名を入力してください', cur)||'').trim();
+        if(!newVal || newVal === cur) return;
+        const arr = getLocationPresets();
+        if(arr.includes(newVal)){ alert('同じ場所が既に保存されています'); return; }
+        const idx = arr.indexOf(cur);
+        if(idx >= 0) arr[idx] = newVal;
+        setLocationPresets(arr);
+        if(locationName === cur) locationName = newVal;
+        if(getLocationDefault() === cur) setLocationDefaultVal(newVal);
+        refreshLocationList(); regenerateC(); regenerateD();
+      });
+      document.getElementById('loc-default').addEventListener('click', () => {
+        const cur = document.getElementById('loc-sel').value;
+        if(!cur) return;
+        if(getLocationDefault() === cur) setLocationDefaultVal(null);
+        else setLocationDefaultVal(cur);
+        refreshLocationList();
+      });
+      document.getElementById('loc-del').addEventListener('click', () => {
+        const cur = document.getElementById('loc-sel').value;
+        if(!cur){ alert('削除する場所を選択してください'); return; }
+        if(!confirm(`「${cur}」を削除しますか？`)) return;
+        const arr = getLocationPresets().filter(v => v !== cur);
+        setLocationPresets(arr);
+        if(locationName === cur) locationName = '';
+        if(getLocationDefault() === cur) setLocationDefaultVal(null);
+        refreshLocationList(); regenerateC(); regenerateD();
+      });
+    }
+
     // ── 内容プリセット ───────────────────────────────
     function getContentPresets(){ try { return (JSON.parse(localStorage.getItem('content_presets'))||[]).sort((a,b)=>a.localeCompare(b,'ja')); } catch(e){ return []; } }
     function setContentPresetsList(arr){ try { localStorage.setItem('content_presets', JSON.stringify(arr)); } catch(e){} }
@@ -2001,7 +2104,7 @@ FOSKIA image 後藤です。</textarea>
       const bcEl = document.getElementById('t-body-c');
       if(!bcEl) return;
       const PREV_DEFAULTS = [
-        "{date}@EXタワープラスビル MA-{room} {time}\n{surname}様入り：{start+10}",
+        "{date}@{location} MA-{room} {time}\n{surname}様入り：{start+10}",
       ];
       if(PREV_DEFAULTS.includes(bcEl.value)){
         bcEl.value = bcEl.value + '\n※{content}';
@@ -2168,10 +2271,12 @@ FOSKIA image 後藤です。</textarea>
       contents = {};
       contactName = '';
       roomNumber = '';
+      locationName = '';
       taskDurations = {};
       finalSlots = {};
       refreshContactList();
       refreshRoomList();
+      refreshLocationList();
       viewYear = today.getFullYear(); viewMonth = today.getMonth();
       setStepView(1);
       document.getElementById('restore-banner').style.display='none';
@@ -2240,6 +2345,7 @@ FOSKIA image 後藤です。</textarea>
     setupPresets('d', { header: 't-header-d', body: 't-body-d', footer: 't-footer-d' }, regenerateD);
     setupContact();
     setupRoom();
+    setupLocation();
     setupContentPresets();
 
     // ── Startup ──────────────────────────────────────
@@ -2288,6 +2394,25 @@ FOSKIA image 後藤です。</textarea>
         refreshRoomList();
       }
     }
+    // 場所：旧テンプレ内の固定文字列「EXタワープラスビル」を {location} に置換し、プリセットへ登録
+    ['t-body-c','t-body-d'].forEach(id => {
+      const el = document.getElementById(id);
+      if(!el) return;
+      if(el.value.includes('EXタワープラスビル')){
+        el.value = el.value.replace(/EXタワープラスビル/g, '{location}');
+        const arr = getLocationPresets();
+        if(!arr.includes('EXタワープラスビル')){ arr.push('EXタワープラスビル'); setLocationPresets(arr); }
+        if(!getLocationDefault()) setLocationDefaultVal('EXタワープラスビル');
+      }
+    });
+    // 場所のデフォルト適用
+    if(!locationName){
+      const lDef = getLocationDefault();
+      if(lDef && getLocationPresets().includes(lDef)){
+        locationName = lDef;
+      }
+    }
+    refreshLocationList();
     saveTmplCurrent();
     // 旧バージョンからの移行（schedule_session → 履歴1件）
     try {
