@@ -61,6 +61,19 @@
     .step2-dur-row:last-child { margin-bottom: 0; }
     .step2-dur-content { font-size: .85rem; color: var(--text); font-weight: 600; min-width: 130px; flex-shrink: 0; }
     .step2-mini-label { font-size: .7rem; color: var(--text3); flex-shrink: 0; }
+
+    /* ── 件名セクション ── */
+    .subject-box { margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+    .subject-proj-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .subject-proj-row label { font-size: .7rem; color: var(--text3); font-weight: 600; white-space: nowrap; }
+    .subject-proj-input { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: .82rem; padding: 6px 10px; font-family: inherit; outline: none; transition: border-color .15s; }
+    .subject-proj-input:focus { border-color: var(--accent); }
+    .subject-preview-row { display: flex; align-items: center; gap: 8px; }
+    .subject-prev-label { font-size: .62rem; font-weight: 700; color: var(--text3); letter-spacing: .08em; flex-shrink: 0; }
+    .subject-prev-text { flex: 1; font-size: .82rem; color: var(--text); background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 7px 10px; word-break: break-all; line-height: 1.5; }
+    .subject-copy-btn { background: none; border: 1px solid var(--border); color: var(--text2); border-radius: var(--radius-sm); font-size: .72rem; padding: 6px 12px; cursor: pointer; font-family: inherit; transition: all .12s; white-space: nowrap; flex-shrink: 0; }
+    .subject-copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .subject-copy-btn.copied { border-color: var(--green); color: var(--green); }
     .step2-dur-select { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: .82rem; padding: 0 11px; height: 32px; font-family: inherit; outline: none; cursor: pointer; min-width: 110px; transition: border-color .15s; }
     .step2-dur-select:focus { border-color: var(--accent); }
 
@@ -406,6 +419,17 @@
         </div>
 
         <div class="card">
+          <div class="subject-box">
+            <div class="subject-proj-row">
+              <label>案件名</label>
+              <input type="text" class="subject-proj-input" id="proj-a" placeholder="例：ABEMA案件">
+            </div>
+            <div class="subject-preview-row">
+              <span class="subject-prev-label">件名</span>
+              <span class="subject-prev-text" id="subject-a"></span>
+              <button class="subject-copy-btn" id="subject-copy-a">コピー</button>
+            </div>
+          </div>
           <div class="output-header">
             <div class="card-title" style="margin-bottom:0">A社向け文面</div>
             <button class="copy-btn" id="copy-btn-a">コピー</button>
@@ -457,6 +481,17 @@
 
       <div class="right-col">
         <div class="card">
+          <div class="subject-box">
+            <div class="subject-proj-row">
+              <label>案件名</label>
+              <input type="text" class="subject-proj-input" id="proj-b" placeholder="例：ABEMA案件">
+            </div>
+            <div class="subject-preview-row">
+              <span class="subject-prev-label">件名</span>
+              <span class="subject-prev-text" id="subject-b"></span>
+              <button class="subject-copy-btn" id="subject-copy-b">コピー</button>
+            </div>
+          </div>
           <div class="output-header">
             <div class="card-title" style="margin-bottom:0">B社向け文面</div>
             <button class="copy-btn" id="copy-btn-b">コピー</button>
@@ -839,11 +874,12 @@ FOSKIA image 後藤です。</textarea>
     let roomNumber = ''; // MAルーム番号（任意）— {room} に展開
     let locationName = ''; // 場所名（任意）— {location} に展開
     let taskDurations = {}; // { contentName: minutes } — タスクごとの内容別所要時間
+    let projectName = ''; // 案件名（件名の【】内に入る）
     let finalSlots = {}; // { contentKey: { date, start, end } } — STEP 3 で内容ごとに確定した日時
 
     function dateKey(y,m,d){ return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
     function parseKey(k){ const [y,m,d]=k.split('-').map(Number); return {y,m:m-1,d}; }
-    function fmtDate(k){ const {y,m,d}=parseKey(k); return `${m+1}月${d}日（${DOW_JA[new Date(y,m,d).getDay()]}）`; }
+    function fmtDate(k){ const {y,m,d}=parseKey(k); return `${m+1}月${d}日(${DOW_JA[new Date(y,m,d).getDay()]})`; }
     function addMin(t,n){ const [h,mi]=t.split(':').map(Number); let s=h*60+mi+n; s=((s%1440)+1440)%1440; return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; }
 
     // テンプレート置換タグ展開: {date}{time}{start}{end}{start+N}{start-N}{end+N}{end-N}
@@ -1103,9 +1139,29 @@ FOSKIA image 後藤です。</textarea>
       return row;
     }
 
+    // ── 件名生成 ─────────────────────────────────────
+    // 候補日を件名用に連結（複数は「・」区切り）
+    function subjectDates(){
+      return Object.keys(selected).sort().map(k => fmtDate(k)).join('・');
+    }
+    function regenerateSubjects(){
+      const proj = projectName.trim();
+      const pre = proj ? `【${proj}】` : '';
+      const dates = subjectDates();
+      // STEP1：【案件名】◯月◯日(◯)ナレーター様スケジュールのご確認
+      const subjA = `${pre}${dates}ナレーター様スケジュールのご確認`;
+      // STEP2：【案件名】MA室のご相談 ◯月◯日(◯)
+      const subjB = `${pre}MA室のご相談${dates ? ' ' + dates : ''}`;
+      const elA = document.getElementById('subject-a');
+      const elB = document.getElementById('subject-b');
+      if(elA) elA.textContent = subjA;
+      if(elB) elB.textContent = subjB;
+    }
+
     // ── Generate A（日付＋指定があれば時間も）─────────
     function regenerateA(){
       saveSession();
+      regenerateSubjects();
       const subj='';
       const hdr=document.getElementById('t-header-a').value, ftr=document.getElementById('t-footer-a').value;
       const keys=Object.keys(selected).sort(), out=document.getElementById('output-a');
@@ -1340,8 +1396,8 @@ FOSKIA image 後藤です。</textarea>
         keys.forEach(k=>{
           const [y,m,d]=k.split('-').map(Number);
           const dt=new Date(y,m-1,d);
-          if(prevMonth===m) dateLabels.push(`${d}日（${DOW_JA[dt.getDay()]}）`);
-          else dateLabels.push(`${m}月${d}日（${DOW_JA[dt.getDay()]}）`);
+          if(prevMonth===m) dateLabels.push(`${d}日(${DOW_JA[dt.getDay()]})`);
+          else dateLabels.push(`${m}月${d}日(${DOW_JA[dt.getDay()]})`);
           prevMonth=m;
         });
         const datesStr = dateLabels.join('と');
@@ -1752,6 +1808,7 @@ FOSKIA image 後藤です。</textarea>
         roomNumber,
         locationName,
         taskDurations,
+        projectName,
         finalSlots,
         step,
         duration: gv('s-duration'),
@@ -1780,6 +1837,9 @@ FOSKIA image 後藤です。</textarea>
       roomNumber = h.roomNumber || '';
       locationName = h.locationName || '';
       taskDurations = h.taskDurations || {};
+      projectName = h.projectName || '';
+      document.getElementById('proj-a').value = projectName;
+      document.getElementById('proj-b').value = projectName;
       // 履歴に保存されたルーム番号／場所がプリセットになければ追加
       if(roomNumber && !getRoomPresets().includes(roomNumber)){
         const arr = getRoomPresets(); arr.push(roomNumber); setRoomPresets(arr);
@@ -1928,6 +1988,35 @@ FOSKIA image 後藤です。</textarea>
       btn.textContent = isDef ? '★' : '☆';
       btn.classList.toggle('on', isDef);
       btn.title = isDef ? 'デフォルトを解除' : 'デフォルトに設定';
+    }
+
+    // ── 件名（案件名）セットアップ ───────────────────
+    function setupSubject(){
+      const projA = document.getElementById('proj-a');
+      const projB = document.getElementById('proj-b');
+      const sync = (val) => {
+        projectName = val;
+        if(projA.value !== val) projA.value = val;
+        if(projB.value !== val) projB.value = val;
+        regenerateSubjects();
+        saveSession();
+      };
+      projA.addEventListener('input', () => sync(projA.value));
+      projB.addEventListener('input', () => sync(projB.value));
+      // コピーボタン
+      const setupSubjCopy = (btnId, textId) => {
+        document.getElementById(btnId).addEventListener('click', () => {
+          const t = document.getElementById(textId).textContent;
+          if(!t) return;
+          navigator.clipboard.writeText(t).then(() => {
+            const b = document.getElementById(btnId);
+            b.textContent = 'コピーしました'; b.classList.add('copied');
+            setTimeout(() => { b.textContent = 'コピー'; b.classList.remove('copied'); }, 1800);
+          });
+        });
+      };
+      setupSubjCopy('subject-copy-a', 'subject-a');
+      setupSubjCopy('subject-copy-b', 'subject-b');
     }
 
     function setupContact(){
@@ -2536,6 +2625,9 @@ FOSKIA image 後藤です。</textarea>
       roomNumber = '';
       locationName = '';
       taskDurations = {};
+      projectName = '';
+      document.getElementById('proj-a').value = '';
+      document.getElementById('proj-b').value = '';
       finalSlots = {};
       refreshContactList();
       refreshRoomList();
@@ -2608,6 +2700,7 @@ FOSKIA image 後藤です。</textarea>
     setupPresets('d', { header: 't-header-d', body: 't-body-d', footer: 't-footer-d' }, regenerateD);
     setupContact();
     setupRoom();
+    setupSubject();
     setupLocation();
     setupContentPresets();
     setupSettingsShare();
