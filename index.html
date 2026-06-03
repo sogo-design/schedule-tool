@@ -2028,6 +2028,7 @@ FOSKIA image 後藤です。</textarea>
         o.textContent=(v===def?'★ ':'')+v; sel.appendChild(o);
       });
       if(cur && getProjectPresets().includes(cur)) sel.value = cur; // 再構築後も選択維持
+      else if(def && getProjectPresets().includes(def)) sel.value = def; // 選択がなければデフォルトを選択
       updateProjectBtnState(); updateProjectDefaultBtn();
     }
     function updateProjectBtnState(){
@@ -2425,6 +2426,7 @@ FOSKIA image 後藤です。</textarea>
         sel.appendChild(o);
       });
       if(cur && getContentPresets().includes(cur)) sel.value = cur;
+      else if(def && getContentPresets().includes(def)) sel.value = def;
       updateContentBtnState(); updateContentDefaultBtn();
     }
     function updateContentBtnState(){
