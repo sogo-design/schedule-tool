@@ -2020,12 +2020,14 @@ FOSKIA image 後藤です。</textarea>
     }
     function refreshProjectSelect(){
       const sel = document.getElementById('project-preset-sel');
+      const cur = sel.value; // 現在の選択を保持
       const def = getProjectDefault();
       sel.innerHTML = '<option value="">― 管理する案件名を選択 ―</option>';
       getProjectPresets().forEach(v => {
         const o=document.createElement('option'); o.value=v;
         o.textContent=(v===def?'★ ':'')+v; sel.appendChild(o);
       });
+      if(cur && getProjectPresets().includes(cur)) sel.value = cur; // 再構築後も選択維持
       updateProjectBtnState(); updateProjectDefaultBtn();
     }
     function updateProjectBtnState(){
@@ -2414,6 +2416,7 @@ FOSKIA image 後藤です。</textarea>
 
     function refreshContentSelect(){
       const sel = document.getElementById('content-preset-sel');
+      const cur = sel.value;
       const def = getContentDefault();
       sel.innerHTML = '<option value="">― 管理する内容を選択 ―</option>';
       getContentPresets().forEach(v => {
@@ -2421,6 +2424,7 @@ FOSKIA image 後藤です。</textarea>
         o.textContent = (v === def ? '★ ' : '') + v;
         sel.appendChild(o);
       });
+      if(cur && getContentPresets().includes(cur)) sel.value = cur;
       updateContentBtnState(); updateContentDefaultBtn();
     }
     function updateContentBtnState(){
