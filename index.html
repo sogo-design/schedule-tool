@@ -348,6 +348,18 @@
     </div>
   </div>
 
+  <div class="content-bar">
+    <label>案件名プリセット（任意）</label>
+    <select class="preset-sel" id="project-preset-sel"><option value="">― 管理する案件名を選択 ―</option></select>
+    <button class="preset-btn add" id="project-add">+ 追加</button>
+    <button class="preset-btn" id="project-rename">改名</button>
+    <button class="preset-btn icon star" id="project-default" title="デフォルトに設定">☆</button>
+    <button class="preset-btn del" id="project-del">削除</button>
+    <span class="contact-hint">各STEPの案件名入力欄に候補表示／件名の【】に入ります</span>
+  </div>
+
+  <datalist id="project-options"></datalist>
+
   <div class="contact-bar">
     <label>確認者（任意）</label>
     <select class="preset-sel" id="contact-sel">
@@ -422,7 +434,7 @@
           <div class="subject-box">
             <div class="subject-proj-row">
               <label>案件名</label>
-              <input type="text" class="subject-proj-input" id="proj-a" placeholder="例：ABEMA案件">
+              <input type="text" class="subject-proj-input" id="proj-a" placeholder="例：ABEMA案件" list="project-options">
             </div>
             <div class="subject-preview-row">
               <span class="subject-prev-label">件名</span>
@@ -484,7 +496,7 @@
           <div class="subject-box">
             <div class="subject-proj-row">
               <label>案件名</label>
-              <input type="text" class="subject-proj-input" id="proj-b" placeholder="例：ABEMA案件">
+              <input type="text" class="subject-proj-input" id="proj-b" placeholder="例：ABEMA案件" list="project-options">
             </div>
             <div class="subject-preview-row">
               <span class="subject-prev-label">件名</span>
@@ -682,6 +694,7 @@ FOSKIA image 後藤です。</textarea>
       'content_presets','content_default',
       'room_presets','room_default',
       'location_presets','location_default',
+      'project_presets','project_default',
     ];
     // 組み込みデフォルト（URLに焼き込み）。空オブジェクトのキーは適用しない。
     // ここに値を入れておくと、初めて開いた人にも自動でそのテンプレートが入る。
@@ -1990,6 +2003,81 @@ FOSKIA image 後藤です。</textarea>
       btn.title = isDef ? 'デフォルトを解除' : 'デフォルトに設定';
     }
 
+    // ── 案件名プリセット ─────────────────────────────
+    function getProjectPresets(){ try { return (JSON.parse(localStorage.getItem('project_presets'))||[]).sort((a,b)=>a.localeCompare(b,'ja')); } catch(e){ return []; } }
+    function setProjectPresetsList(arr){ try { localStorage.setItem('project_presets', JSON.stringify(arr)); } catch(e){} }
+    function getProjectDefault(){ return localStorage.getItem('project_default') || ''; }
+    function setProjectDefaultVal(val){ if(val) localStorage.setItem('project_default', val); else localStorage.removeItem('project_default'); }
+    function refreshProjectDatalist(){
+      const list = document.getElementById('project-options');
+      list.innerHTML = '';
+      getProjectPresets().forEach(v => { const o=document.createElement('option'); o.value=v; list.appendChild(o); });
+    }
+    function refreshProjectSelect(){
+      const sel = document.getElementById('project-preset-sel');
+      const def = getProjectDefault();
+      sel.innerHTML = '<option value="">― 管理する案件名を選択 ―</option>';
+      getProjectPresets().forEach(v => {
+        const o=document.createElement('option'); o.value=v;
+        o.textContent=(v===def?'★ ':'')+v; sel.appendChild(o);
+      });
+      updateProjectBtnState(); updateProjectDefaultBtn();
+    }
+    function updateProjectBtnState(){
+      const sel=document.getElementById('project-preset-sel'); const has=sel.value!=='';
+      document.getElementById('project-rename').disabled=!has;
+      document.getElementById('project-del').disabled=!has;
+    }
+    function updateProjectDefaultBtn(){
+      const sel=document.getElementById('project-preset-sel'); const btn=document.getElementById('project-default'); const cur=sel.value;
+      if(!cur){ btn.disabled=true; btn.textContent='☆'; btn.classList.remove('on'); btn.title='デフォルトに設定'; return; }
+      btn.disabled=false;
+      const isDef=cur===getProjectDefault();
+      btn.textContent=isDef?'★':'☆'; btn.classList.toggle('on',isDef);
+      btn.title=isDef?'デフォルトを解除':'デフォルトに設定';
+    }
+    function setupProjectPresets(){
+      refreshProjectSelect(); refreshProjectDatalist();
+      document.getElementById('project-preset-sel').addEventListener('change', () => { updateProjectBtnState(); updateProjectDefaultBtn(); });
+      document.getElementById('project-add').addEventListener('click', () => {
+        const val=(prompt('案件名を入力してください（例：ABEMA案件）')||'').trim();
+        if(!val) return;
+        const arr=getProjectPresets();
+        if(arr.includes(val)){ alert('同じ案件名が既に保存されています'); document.getElementById('project-preset-sel').value=val; updateProjectBtnState(); updateProjectDefaultBtn(); return; }
+        arr.push(val); setProjectPresetsList(arr);
+        refreshProjectSelect(); refreshProjectDatalist();
+        document.getElementById('project-preset-sel').value=val;
+        updateProjectBtnState(); updateProjectDefaultBtn();
+      });
+      document.getElementById('project-rename').addEventListener('click', () => {
+        const sel=document.getElementById('project-preset-sel'); const cur=sel.value;
+        if(!cur){ alert('改名する案件名を選択してください'); return; }
+        const newVal=(prompt('新しい案件名を入力してください', cur)||'').trim();
+        if(!newVal || newVal===cur) return;
+        const arr=getProjectPresets();
+        if(arr.includes(newVal)){ alert('同じ案件名が既に保存されています'); return; }
+        const idx=arr.indexOf(cur); if(idx>=0) arr[idx]=newVal;
+        setProjectPresetsList(arr);
+        if(getProjectDefault()===cur) setProjectDefaultVal(newVal);
+        refreshProjectSelect(); refreshProjectDatalist();
+      });
+      document.getElementById('project-default').addEventListener('click', () => {
+        const cur=document.getElementById('project-preset-sel').value;
+        if(!cur) return;
+        if(getProjectDefault()===cur) setProjectDefaultVal(null); else setProjectDefaultVal(cur);
+        refreshProjectSelect();
+      });
+      document.getElementById('project-del').addEventListener('click', () => {
+        const cur=document.getElementById('project-preset-sel').value;
+        if(!cur){ alert('削除する案件名を選択してください'); return; }
+        if(!confirm(`「${cur}」を削除しますか？`)) return;
+        const arr=getProjectPresets().filter(v=>v!==cur);
+        setProjectPresetsList(arr);
+        if(getProjectDefault()===cur) setProjectDefaultVal(null);
+        refreshProjectSelect(); refreshProjectDatalist();
+      });
+    }
+
     // ── 件名（案件名）セットアップ ───────────────────
     function setupSubject(){
       const projA = document.getElementById('proj-a');
@@ -2701,6 +2789,7 @@ FOSKIA image 後藤です。</textarea>
     setupContact();
     setupRoom();
     setupSubject();
+    setupProjectPresets();
     setupLocation();
     setupContentPresets();
     setupSettingsShare();
@@ -2834,6 +2923,16 @@ FOSKIA image 後藤です。</textarea>
       }
     }
     refreshLocationList();
+    // 案件名のデフォルト適用（未入力なら）
+    if(!projectName){
+      const pDef = getProjectDefault();
+      if(pDef && getProjectPresets().includes(pDef)){
+        projectName = pDef;
+        document.getElementById('proj-a').value = projectName;
+        document.getElementById('proj-b').value = projectName;
+        regenerateSubjects();
+      }
+    }
     saveTmplCurrent();
     // 旧バージョンからの移行（schedule_session → 履歴1件）
     try {
