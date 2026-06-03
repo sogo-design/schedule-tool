@@ -1851,6 +1851,11 @@ FOSKIA image 後藤です。</textarea>
       locationName = h.locationName || '';
       taskDurations = h.taskDurations || {};
       projectName = h.projectName || '';
+      // 履歴に案件名がなければ（旧データ等）デフォルトを適用
+      if(!projectName){
+        const pDef = getProjectDefault();
+        if(pDef && getProjectPresets().includes(pDef)) projectName = pDef;
+      }
       document.getElementById('proj-a').value = projectName;
       document.getElementById('proj-b').value = projectName;
       // 履歴に保存されたルーム番号／場所がプリセットになければ追加
