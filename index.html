@@ -325,6 +325,11 @@
         <div class="step-num">3</div>
         <div class="step-lbl">STEP 3</div>
       </div>
+      <div class="step-connector" id="sc-3"></div>
+      <div class="step-item" id="si-4">
+        <div class="step-num">4</div>
+        <div class="step-lbl">STEP 4</div>
+      </div>
     </div>
   </div>
 
@@ -632,6 +637,72 @@ FOSKIA image 後藤です。</textarea>
 
     <div class="step-nav" style="justify-content:space-between">
       <button class="btn-back" id="to-step2-back">&larr; STEP 2 へ戻る</button>
+      <button class="btn-next" id="to-step4">STEP 4 へ &rarr;</button>
+    </div>
+  </div>
+
+  <!-- ══ STEP 4：MAデータ送付（前日）══ -->
+  <div id="step4" style="display:none">
+    <div class="layout s2">
+      <div class="card">
+        <div class="card-title">送付内容の確認</div>
+        <div class="final-hint">STEP 3 で確定した日時・場所・ルーム・内容を参照します。下にギガファイル便などのURLを貼り付けてください。</div>
+        <div id="step4-summary"></div>
+        <div class="field" style="margin-top:14px">
+          <label>ファイルURL（任意）</label>
+          <input type="text" id="file-url" class="subject-proj-input" placeholder="例：https://xxx.gigafile.nu/...">
+        </div>
+      </div>
+
+      <div class="right-col">
+        <div class="card">
+          <div class="output-header">
+            <div class="card-title" style="margin-bottom:0">データ送付文面</div>
+            <button class="copy-btn" id="copy-btn-e">コピー</button>
+          </div>
+          <textarea class="output-textarea" id="output-e" placeholder="STEP 3 で日時を確定してください"></textarea>
+          <button class="tmpl-toggle" id="tmpl-toggle-e">
+            <span class="arrow">▶</span>テンプレートを編集
+          </button>
+          <div class="tmpl-panel" id="tmpl-panel-e">
+            <div class="tmpl-preset-row">
+              <select class="preset-sel" id="preset-sel-e"><option value="">― 保存済みテンプレート ―</option></select>
+              <button class="preset-btn add" id="preset-add-e">+ 新規追加</button>
+              <button class="preset-btn" id="preset-save-e">上書き</button>
+              <button class="preset-btn" id="preset-rename-e" title="名前を変更">改名</button>
+              <button class="preset-btn icon star" id="preset-default-e" title="デフォルトに設定">☆</button>
+              <button class="preset-btn del" id="preset-del-e">削除</button>
+            </div>
+            <div class="field">
+              <label>冒頭文（先頭に1回だけ表示）</label>
+              <textarea id="t-header-e" rows="5">東京サウンド・プロダクション
+ご担当者様
+
+いつもお世話になっております。
+FOSKIA image後藤です。</textarea>
+            </div>
+            <div class="field">
+              <label>本文（決定日程ごとに繰り返し表示）</label>
+              <div class="tmpl-hint">置換タグ：<b>{date}</b>=日付　<b>{start}</b>=開始時刻　<b>{location}</b>=場所　<b>{room}</b>=ルーム番号　<b>{content}</b>=内容</div>
+              <textarea id="t-body-e" rows="3">{date} に {location} MA-{room}で
+{start}からMA予定のデータ（{content}）をお送りします。</textarea>
+            </div>
+            <div class="field">
+              <label>結び文（末尾に1回だけ表示）</label>
+              <div class="tmpl-hint"><b>{fileurl}</b>=ファイルURL</div>
+              <textarea id="t-footer-e" rows="5">※ファイル追加欄
+{fileurl}
+
+お手数おかけしますが
+ご確認よろしくお願いいたします。</textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-nav" style="justify-content:space-between">
+      <button class="btn-back" id="to-step3-back">&larr; STEP 3 へ戻る</button>
       <button class="btn-finish" id="finish-btn">この日程調整を完了する</button>
     </div>
   </div>
@@ -710,6 +781,7 @@ FOSKIA image 後藤です。</textarea>
       tmpl_default_b: "デフォルト",
       tmpl_default_c: "デフォルト",
       tmpl_default_d: "デフォルト",
+      tmpl_default_e: "デフォルト",
       tmpl_presets_a: [{
         name: "デフォルト",
         header: "株式会社青二プロダクション\n塩沢様\n良川様\n山﨑様\n\nいつもお世話になっております。\nFOSKIA image 後藤です。",
@@ -732,6 +804,12 @@ FOSKIA image 後藤です。</textarea>
         body: "{date}@{location} MA-{room} {time}\nナレーター入り：{start+10}",
         footer: "お手数ですがご確認よろしくお願いいたします。"
       }],
+      tmpl_presets_e: [{
+        name: "デフォルト",
+        header: "東京サウンド・プロダクション\nご担当者様\n\nいつもお世話になっております。\nFOSKIA image後藤です。",
+        body: "{date} に {location} MA-{room}で\n{start}からMA予定のデータ（{content}）をお送りします。",
+        footer: "※ファイル追加欄\n{fileurl}\n\nお手数おかけしますが\nご確認よろしくお願いいたします。"
+      }],
       tmpl_current: {
         ha: "株式会社青二プロダクション\n塩沢様\n良川様\n山﨑様\n\nいつもお世話になっております。\nFOSKIA image 後藤です。",
         fa: "お手数おかけしますが、ご確認頂けますと幸いです。\n何卒宜しくお願い申し上げます。",
@@ -743,10 +821,13 @@ FOSKIA image 後藤です。</textarea>
         hd: "株式会社 東京サウンド・プロダクション\n松丸様\n\nいつもお世話になっております。\nFOSKIA image 後藤です。\n\nそれでは以下の時間でお願い出来ますでしょうか。",
         bd: "{date}@{location} MA-{room} {time}\nナレーター入り：{start+10}",
         fd: "お手数ですがご確認よろしくお願いいたします。",
-        selA: "デフォルト", selB: "デフォルト", selC: "デフォルト", selD: "デフォルト"
+        he: "東京サウンド・プロダクション\nご担当者様\n\nいつもお世話になっております。\nFOSKIA image後藤です。",
+        be: "{date} に {location} MA-{room}で\n{start}からMA予定のデータ（{content}）をお送りします。",
+        fe: "※ファイル追加欄\n{fileurl}\n\nお手数おかけしますが\nご確認よろしくお願いいたします。",
+        selA: "デフォルト", selB: "デフォルト", selC: "デフォルト", selD: "デフォルト", selE: "デフォルト"
       }
     };
-    const BUILTIN_VERSION = '5'; // BUILTIN_PRESETS を更新したらこの番号を上げる
+    const BUILTIN_VERSION = '6'; // BUILTIN_PRESETS を更新したらこの番号を上げる
 
     // 初回 or BUILTIN更新時、ローカルに無いプリセットを組み込みデフォルトで補完
     function applyBuiltinPresets(){
@@ -812,6 +893,22 @@ FOSKIA image 後藤です。</textarea>
       });
       localStorage.setItem(FLAG, '1');
     }
+
+    // STEP4テンプレート(he/be/fe)が tmpl_current に無ければBUILTINから補完（既存ユーザー救済）
+    function migrateAddStep4Current(){
+      try {
+        const cur = JSON.parse(localStorage.getItem('tmpl_current'));
+        if(cur){
+          const bp = BUILTIN_PRESETS.tmpl_current;
+          let changed = false;
+          if(cur.he === undefined){ cur.he = bp.he; changed = true; }
+          if(cur.be === undefined){ cur.be = bp.be; changed = true; }
+          if(cur.fe === undefined){ cur.fe = bp.fe; changed = true; }
+          if(changed) localStorage.setItem('tmpl_current', JSON.stringify(cur));
+        }
+      } catch(e){}
+    }
+    migrateAddStep4Current();
     forceTemplateReset();
 
     // 日本の祝日を自動計算（2025〜2040年）
@@ -888,6 +985,7 @@ FOSKIA image 後藤です。</textarea>
     let locationName = ''; // 場所名（任意）— {location} に展開
     let taskDurations = {}; // { contentName: minutes } — タスクごとの内容別所要時間
     let projectName = ''; // 案件名（件名の【】内に入る）
+    let fileUrl = ''; // STEP4 のファイルURL（{fileurl} に展開）
     let finalSlots = {}; // { contentKey: { date, start, end } } — STEP 3 で内容ごとに確定した日時
 
     function dateKey(y,m,d){ return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
@@ -920,7 +1018,8 @@ FOSKIA image 後藤です。</textarea>
         .replace(/\{location\}/g, locationName || '')
         .replace(/\{surname\}/g, surname)
         .replace(/\{content\}/g, slotContent)
-        .replace(/\{narout\}/g, safe.narOut || '');
+        .replace(/\{narout\}/g, safe.narOut || '')
+        .replace(/\{fileurl\}/g, fileUrl || '');
       out = out.replace(/\{(start|end)([+\-＋－])(\d+)\}/g, (m, base, sign, n) => {
         const baseTime = base === 'start' ? startTime : endTime;
         if(!baseTime) return '';
@@ -931,7 +1030,7 @@ FOSKIA image 後藤です。</textarea>
       return out;
     }
     function hasPlaceholders(text){
-      return /\{(date|time|start|end|room|location|surname|content|narout)([+\-＋－]\d+)?\}/.test(text || '');
+      return /\{(date|time|start|end|room|location|surname|content|narout|fileurl)([+\-＋－]\d+)?\}/.test(text || '');
     }
     function getDur(){ return parseInt(document.getElementById('s-duration').value); }
 
@@ -1439,8 +1538,8 @@ FOSKIA image 後藤です。</textarea>
 
     // ── Step switching ───────────────────────────────
     function setStepView(n){
-      for(let i=1;i<=3;i++) document.getElementById('step'+i).style.display = (i===n?'block':'none');
-      for(let i=1;i<=3;i++){
+      for(let i=1;i<=4;i++) document.getElementById('step'+i).style.display = (i===n?'block':'none');
+      for(let i=1;i<=4;i++){
         const si=document.getElementById('si-'+i);
         const sn=si.querySelector('.step-num');
         si.classList.remove('active','done');
@@ -1448,7 +1547,7 @@ FOSKIA image 後藤です。</textarea>
         else if(i===n){ si.classList.add('active'); sn.textContent=String(i); }
         else { sn.textContent=String(i); }
       }
-      for(let i=1;i<=2;i++){
+      for(let i=1;i<=3;i++){
         document.getElementById('sc-'+i).classList.toggle('done', i<n);
       }
     }
@@ -1465,6 +1564,14 @@ FOSKIA image 後藤です。</textarea>
     }
     function exitStep3(){
       setStepView(2); renderTimeEditor(); regenerateB(); saveSession();
+    }
+    function enterStep4(){
+      const hasSlots = Object.values(finalSlots).some(s => s && s.start);
+      if(!hasSlots){ alert('STEP 3 で日時を確定してください'); return; }
+      setStepView(4); renderStep4Summary(); regenerateE(); saveSession();
+    }
+    function exitStep4(){
+      setStepView(3); validateFinalSlots(); renderFinalPicker(); regenerateC(); regenerateD(); saveSession();
     }
 
     // 内容ごとに候補日をグループ化（1日が複数内容を持つ場合は複数グループに入る）
@@ -1762,6 +1869,59 @@ FOSKIA image 後藤です。</textarea>
       }
     }
 
+    // ── Generate E（STEP4 MAデータ送付文面）─────────
+    function regenerateE(){
+      saveSession();
+      const hdr = document.getElementById('t-header-e').value;
+      const body = document.getElementById('t-body-e').value;
+      const ftr = document.getElementById('t-footer-e').value;
+      const out = document.getElementById('output-e');
+
+      const groups = getContentGroups();
+      const contentKeys = sortedContentKeys(groups);
+      const filled = contentKeys
+        .filter(ck => finalSlots[ck] && finalSlots[ck].start)
+        .map(ck => ({ ck, slot: finalSlots[ck] }));
+      if(!filled.length){ out.value = ''; return; }
+
+      const firstSlot = filled[0].slot;
+      const expandedHeader = hasPlaceholders(hdr) ? expandPlaceholders(hdr, firstSlot) : hdr;
+      const expandedFooter = hasPlaceholders(ftr) ? expandPlaceholders(ftr, firstSlot) : ftr;
+      const expandedBodies = filled.map(({ slot }) => expandPlaceholders(body, slot));
+      const parts = [];
+      if(expandedHeader) parts.push(expandedHeader);
+      if(expandedBodies.length) parts.push(expandedBodies.join('\n\n'));
+      if(expandedFooter) parts.push(expandedFooter);
+      out.value = parts.join('\n\n');
+    }
+
+    // STEP4：確定内容のサマリ表示
+    function renderStep4Summary(){
+      const c = document.getElementById('step4-summary');
+      if(!c) return;
+      c.innerHTML = '';
+      const groups = getContentGroups();
+      const contentKeys = sortedContentKeys(groups);
+      const filled = contentKeys
+        .filter(ck => finalSlots[ck] && finalSlots[ck].start)
+        .map(ck => ({ ck, slot: finalSlots[ck] }));
+      if(!filled.length){
+        c.innerHTML = '<div class="slots-empty"><span>📅</span>確定した日時がありません</div>';
+        return;
+      }
+      filled.forEach(({ ck, slot }) => {
+        const item = document.createElement('div'); item.className = 'final-item';
+        const info = document.createElement('div'); info.className = 'final-info';
+        const dd = document.createElement('div'); dd.className = 'final-date';
+        dd.textContent = `${fmtDate(slot.date)} ${slot.start}〜`;
+        const dt = document.createElement('div'); dt.className = 'final-time';
+        const roomTxt = (slot.room !== undefined && slot.room !== null && slot.room !== '') ? `MA-${slot.room}` : 'ルーム未設定';
+        dt.textContent = `${locationName || '場所未設定'} ${roomTxt}${ck ? ' / ' + ck : ''}`;
+        info.append(dd, dt); item.appendChild(info);
+        c.appendChild(item);
+      });
+    }
+
     // ── Copy ──────────────────────────────────────────
     function setupCopy(btnId,taId){
       document.getElementById(btnId).addEventListener('click',()=>{
@@ -1772,7 +1932,7 @@ FOSKIA image 後藤です。</textarea>
         });
       });
     }
-    setupCopy('copy-btn-a','output-a'); setupCopy('copy-btn-b','output-b'); setupCopy('copy-btn-c','output-c'); setupCopy('copy-btn-d','output-d');
+    setupCopy('copy-btn-a','output-a'); setupCopy('copy-btn-b','output-b'); setupCopy('copy-btn-c','output-c'); setupCopy('copy-btn-d','output-d'); setupCopy('copy-btn-e','output-e');
 
     // ── Template toggles ─────────────────────────────
     function setupToggle(tid,pid){
@@ -1781,7 +1941,7 @@ FOSKIA image 後藤です。</textarea>
         document.getElementById(tid).classList.toggle('open',o);
       });
     }
-    setupToggle('tmpl-toggle-a','tmpl-panel-a'); setupToggle('tmpl-toggle-b','tmpl-panel-b'); setupToggle('tmpl-toggle-c','tmpl-panel-c'); setupToggle('tmpl-toggle-d','tmpl-panel-d');
+    setupToggle('tmpl-toggle-a','tmpl-panel-a'); setupToggle('tmpl-toggle-b','tmpl-panel-b'); setupToggle('tmpl-toggle-c','tmpl-panel-c'); setupToggle('tmpl-toggle-d','tmpl-panel-d'); setupToggle('tmpl-toggle-e','tmpl-panel-e');
 
     // ── Persistence helpers ──────────────────────────
     const gv  = id => document.getElementById(id).value;
@@ -1811,7 +1971,8 @@ FOSKIA image 後藤です。</textarea>
       }
       if(!activeHistoryId){ activeHistoryId = newHistId(); setActive(activeHistoryId); }
       let step = 1;
-      if(document.getElementById('step3').style.display==='block') step = 3;
+      if(document.getElementById('step4').style.display==='block') step = 4;
+      else if(document.getElementById('step3').style.display==='block') step = 3;
       else if(document.getElementById('step2').style.display==='block') step = 2;
       const entry = {
         id: activeHistoryId,
@@ -1822,6 +1983,7 @@ FOSKIA image 後藤です。</textarea>
         locationName,
         taskDurations,
         projectName,
+        fileUrl,
         finalSlots,
         step,
         duration: gv('s-duration'),
@@ -1851,6 +2013,8 @@ FOSKIA image 後藤です。</textarea>
       locationName = h.locationName || '';
       taskDurations = h.taskDurations || {};
       projectName = h.projectName || '';
+      fileUrl = h.fileUrl || '';
+      document.getElementById('file-url').value = fileUrl;
       // 履歴に案件名がなければ（旧データ等）デフォルトを適用
       if(!projectName){
         const pDef = getProjectDefault();
@@ -1883,9 +2047,11 @@ FOSKIA image 後藤です。</textarea>
       document.getElementById('output-b').value = '';
       document.getElementById('output-c').value = '';
       document.getElementById('output-d').value = '';
+      document.getElementById('output-e').value = '';
       setStepView(1);
       renderCalendar(); renderDateList(); regenerateA();
-      if(h.step===3){ setStepView(3); renderTimeEditor(); regenerateB(); validateFinalSlots(); renderFinalPicker(); regenerateC(); regenerateD(); }
+      if(h.step===4){ setStepView(4); renderTimeEditor(); regenerateB(); validateFinalSlots(); renderFinalPicker(); regenerateC(); regenerateD(); renderStep4Summary(); regenerateE(); }
+      else if(h.step===3){ setStepView(3); renderTimeEditor(); regenerateB(); validateFinalSlots(); renderFinalPicker(); regenerateC(); regenerateD(); }
       else if(h.step===2){ setStepView(2); renderTimeEditor(); regenerateB(); }
       updateHistCount();
       return true;
@@ -1929,7 +2095,7 @@ FOSKIA image 後藤です。</textarea>
         const item = document.createElement('div');
         item.className = 'hist-item' + (h.id===activeHistoryId ? ' active':'');
         const dates = Object.keys(h.selected||{}).length;
-        const stepCls = h.step===3 ? 's3' : (h.step===2 ? 's2' : '');
+        const stepCls = (h.step===3||h.step===4) ? 's3' : (h.step===2 ? 's2' : '');
         const title = getHistoryDisplayName(h);
         item.innerHTML = `
           <div class="hist-info">
@@ -2512,20 +2678,23 @@ FOSKIA image 後藤です。</textarea>
     // ── Template current (always persisted) ──────────
     function saveTmplCurrent(){
       try {
-        const aArr=getPresets('a'), bArr=getPresets('b'), cArr=getPresets('c'), dArr=getPresets('d');
+        const aArr=getPresets('a'), bArr=getPresets('b'), cArr=getPresets('c'), dArr=getPresets('d'), eArr=getPresets('e');
         const selAVal=document.getElementById('preset-sel-a').value;
         const selBVal=document.getElementById('preset-sel-b').value;
         const selCVal=document.getElementById('preset-sel-c').value;
         const selDVal=document.getElementById('preset-sel-d').value;
+        const selEVal=document.getElementById('preset-sel-e').value;
         localStorage.setItem('tmpl_current', JSON.stringify({
           ha: gv('t-header-a'), fa: gv('t-footer-a'),
           hb: gv('t-header-b'), fb: gv('t-footer-b'),
           hc: gv('t-header-c'), bc: gv('t-body-c'), fc: gv('t-footer-c'),
           hd: gv('t-header-d'), bd: gv('t-body-d'), fd: gv('t-footer-d'),
+          he: gv('t-header-e'), be: gv('t-body-e'), fe: gv('t-footer-e'),
           selA: (selAVal!=='' && aArr[selAVal]) ? aArr[selAVal].name : null,
           selB: (selBVal!=='' && bArr[selBVal]) ? bArr[selBVal].name : null,
           selC: (selCVal!=='' && cArr[selCVal]) ? cArr[selCVal].name : null,
           selD: (selDVal!=='' && dArr[selDVal]) ? dArr[selDVal].name : null,
+          selE: (selEVal!=='' && eArr[selEVal]) ? eArr[selEVal].name : null,
         }));
       } catch(e){}
     }
@@ -2544,10 +2713,14 @@ FOSKIA image 後藤です。</textarea>
       if(t.bd !== undefined) setv('t-body-d', t.bd);
       else setv('t-body-d', ''); // 旧データ：bodyフィールド未保存 → 空にしてマイグレーションを促す
       if(t.fd!=null) setv('t-footer-d',t.fd);
+      if(t.he!=null) setv('t-header-e',t.he);
+      if(t.be !== undefined) setv('t-body-e', t.be);
+      if(t.fe!=null) setv('t-footer-e',t.fe);
       if(t.selA){ const i=getPresets('a').findIndex(p=>p.name===t.selA); if(i>=0) document.getElementById('preset-sel-a').value=i; }
       if(t.selB){ const i=getPresets('b').findIndex(p=>p.name===t.selB); if(i>=0) document.getElementById('preset-sel-b').value=i; }
       if(t.selC){ const i=getPresets('c').findIndex(p=>p.name===t.selC); if(i>=0) document.getElementById('preset-sel-c').value=i; }
       if(t.selD){ const i=getPresets('d').findIndex(p=>p.name===t.selD); if(i>=0) document.getElementById('preset-sel-d').value=i; }
+      if(t.selE){ const i=getPresets('e').findIndex(p=>p.name===t.selE); if(i>=0) document.getElementById('preset-sel-e').value=i; }
     }
 
     // C body に {content} 行がない（旧デフォルトのまま）なら ※{content} 行を追加
@@ -2725,8 +2898,10 @@ FOSKIA image 後藤です。</textarea>
       locationName = '';
       taskDurations = {};
       projectName = '';
+      fileUrl = '';
       document.getElementById('proj-a').value = '';
       document.getElementById('proj-b').value = '';
+      document.getElementById('file-url').value = '';
       finalSlots = {};
       refreshContactList();
       refreshRoomList();
@@ -2737,6 +2912,7 @@ FOSKIA image 後藤です。</textarea>
       document.getElementById('output-b').value='';
       document.getElementById('output-c').value='';
       document.getElementById('output-d').value='';
+      document.getElementById('output-e').value='';
       renderCalendar(); renderDateList(); regenerateA();
     }
     // 履歴ごと削除して初期化
@@ -2758,7 +2934,13 @@ FOSKIA image 後藤です。</textarea>
     document.getElementById('to-step1').addEventListener('click', exitStep2);
     document.getElementById('to-step3').addEventListener('click', enterStep3);
     document.getElementById('to-step2-back').addEventListener('click', exitStep3);
+    document.getElementById('to-step4').addEventListener('click', enterStep4);
+    document.getElementById('to-step3-back').addEventListener('click', exitStep4);
     document.getElementById('finish-btn').addEventListener('click', finishTask);
+    document.getElementById('file-url').addEventListener('input', () => {
+      fileUrl = document.getElementById('file-url').value;
+      regenerateE();
+    });
     document.getElementById('new-task-btn').addEventListener('click', newTask);
     document.getElementById('hist-btn').addEventListener('click', openHistModal);
     document.getElementById('hist-close').addEventListener('click', closeHistModal);
@@ -2792,11 +2974,15 @@ FOSKIA image 後藤です。</textarea>
     document.getElementById('t-header-d').addEventListener('input',()=>{ regenerateD(); saveTmplCurrent(); });
     document.getElementById('t-body-d').addEventListener('input',()=>{ regenerateD(); saveTmplCurrent(); });
     document.getElementById('t-footer-d').addEventListener('input',()=>{ regenerateD(); saveTmplCurrent(); });
+    document.getElementById('t-header-e').addEventListener('input',()=>{ regenerateE(); saveTmplCurrent(); });
+    document.getElementById('t-body-e').addEventListener('input',()=>{ regenerateE(); saveTmplCurrent(); });
+    document.getElementById('t-footer-e').addEventListener('input',()=>{ regenerateE(); saveTmplCurrent(); });
 
     setupPresets('a', { header: 't-header-a', footer: 't-footer-a' }, regenerateA);
     setupPresets('b', { header: 't-header-b', footer: 't-footer-b' }, regenerateB);
     setupPresets('c', { header: 't-header-c', body: 't-body-c', footer: 't-footer-c' }, regenerateC);
     setupPresets('d', { header: 't-header-d', body: 't-body-d', footer: 't-footer-d' }, regenerateD);
+    setupPresets('e', { header: 't-header-e', body: 't-body-e', footer: 't-footer-e' }, regenerateE);
     setupContact();
     setupRoom();
     setupSubject();
@@ -2877,8 +3063,9 @@ FOSKIA image 後藤です。</textarea>
       b: { header: 't-header-b', footer: 't-footer-b' },
       c: { header: 't-header-c', body: 't-body-c', footer: 't-footer-c' },
       d: { header: 't-header-d', body: 't-body-d', footer: 't-footer-d' },
+      e: { header: 't-header-e', body: 't-body-e', footer: 't-footer-e' },
     };
-    ['a','b','c','d'].forEach(w=>{
+    ['a','b','c','d','e'].forEach(w=>{
       const sel=document.getElementById('preset-sel-'+w);
       if(sel.value===''){
         const def=getDefault(w);
