@@ -690,8 +690,7 @@ FOSKIA image後藤です。</textarea>
             <div class="field">
               <label>結び文（末尾に1回だけ表示）</label>
               <div class="tmpl-hint"><b>{fileurl}</b>=ファイルURL</div>
-              <textarea id="t-footer-e" rows="5">※ファイル追加欄
-{fileurl}
+              <textarea id="t-footer-e" rows="5">{fileurl}
 
 お手数おかけしますが
 ご確認よろしくお願いいたします。</textarea>
@@ -808,7 +807,7 @@ FOSKIA image後藤です。</textarea>
         name: "デフォルト",
         header: "東京サウンド・プロダクション\nご担当者様\n\nいつもお世話になっております。\nFOSKIA image後藤です。",
         body: "{date} に {location} MA-{room}で\n{start}からMA予定のデータ（{content}）をお送りします。",
-        footer: "※ファイル追加欄\n{fileurl}\n\nお手数おかけしますが\nご確認よろしくお願いいたします。"
+        footer: "{fileurl}\n\nお手数おかけしますが\nご確認よろしくお願いいたします。"
       }],
       tmpl_current: {
         ha: "株式会社青二プロダクション\n塩沢様\n良川様\n山﨑様\n\nいつもお世話になっております。\nFOSKIA image 後藤です。",
@@ -823,7 +822,7 @@ FOSKIA image後藤です。</textarea>
         fd: "お手数ですがご確認よろしくお願いいたします。",
         he: "東京サウンド・プロダクション\nご担当者様\n\nいつもお世話になっております。\nFOSKIA image後藤です。",
         be: "{date} に {location} MA-{room}で\n{start}からMA予定のデータ（{content}）をお送りします。",
-        fe: "※ファイル追加欄\n{fileurl}\n\nお手数おかけしますが\nご確認よろしくお願いいたします。",
+        fe: "{fileurl}\n\nお手数おかけしますが\nご確認よろしくお願いいたします。",
         selA: "デフォルト", selB: "デフォルト", selC: "デフォルト", selD: "デフォルト", selE: "デフォルト"
       }
     };
@@ -909,6 +908,27 @@ FOSKIA image後藤です。</textarea>
       } catch(e){}
     }
     migrateAddStep4Current();
+
+    // 「※ファイル追加欄」の文言をメール文面から削除（既存ユーザー救済・1回のみ）
+    function migrateRemoveFileLabel(){
+      const FLAG = '_filelabel_removed';
+      if(localStorage.getItem(FLAG)){ return; }
+      try {
+        const cur = JSON.parse(localStorage.getItem('tmpl_current'));
+        if(cur && cur.fe && cur.fe.includes('※ファイル追加欄')){
+          cur.fe = cur.fe.replace(/※ファイル追加欄\n?/g, '');
+          localStorage.setItem('tmpl_current', JSON.stringify(cur));
+        }
+        const arr = JSON.parse(localStorage.getItem('tmpl_presets_e') || 'null');
+        if(Array.isArray(arr)){
+          let ch = false;
+          arr.forEach(p => { if(p.footer && p.footer.includes('※ファイル追加欄')){ p.footer = p.footer.replace(/※ファイル追加欄\n?/g, ''); ch = true; } });
+          if(ch) localStorage.setItem('tmpl_presets_e', JSON.stringify(arr));
+        }
+      } catch(e){}
+      localStorage.setItem(FLAG, '1');
+    }
+    migrateRemoveFileLabel();
     forceTemplateReset();
 
     // 日本の祝日を自動計算（2025〜2040年）
@@ -1615,6 +1635,8 @@ FOSKIA image後藤です。</textarea>
         if(oldCk && dateContents.includes(oldCk)) ck = oldCk;
         else if(dateContents.length > 0) ck = dateContents[0];
         else ck = '';
+        // ルーム番号が未設定ならグローバルのデフォルトを補完
+        if(!s.room) s.room = roomNumber || getRoomDefault() || '';
         if(!newSlots[ck]) newSlots[ck] = s;
       });
       finalSlots = newSlots;
@@ -1671,7 +1693,7 @@ FOSKIA image後藤です。</textarea>
             const dur = ck ? getDurationFor(ck) : getDur();
             const endTime = dur > 0 ? addMin(startTime, dur) : (firstSlot && firstSlot.end ? firstSlot.end : '');
             // 入り終了（B）デフォルト = 入り開始(開始+10) + 30 = 開始+40
-            finalSlots[ck] = { date: k, start: startTime, end: endTime, narOut: addMin(startTime, 40), room: roomNumber };
+            finalSlots[ck] = { date: k, start: startTime, end: endTime, narOut: addMin(startTime, 40), room: (roomNumber || getRoomDefault() || '') };
             renderFinalPicker(); regenerateC(); regenerateD();
           });
           dateSection.appendChild(item);
@@ -2010,7 +2032,9 @@ FOSKIA image後藤です。</textarea>
       });
       contactName = h.contactName || '';
       roomNumber = h.roomNumber || '';
+      if(!roomNumber){ const rd=getRoomDefault(); if(rd && getRoomPresets().includes(rd)) roomNumber=rd; }
       locationName = h.locationName || '';
+      if(!locationName){ const ld=getLocationDefault(); if(ld && getLocationPresets().includes(ld)) locationName=ld; }
       taskDurations = h.taskDurations || {};
       projectName = h.projectName || '';
       fileUrl = h.fileUrl || '';
