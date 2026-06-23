@@ -297,6 +297,13 @@
     .narout-label { font-size: .8rem; color: var(--text2); font-weight: 600; min-width: 110px; flex-shrink: 0; }
     .narout-intime { font-size: .8rem; color: var(--text2); }
     .narout-sep { color: var(--text3); font-size: .8rem; }
+
+    /* ── STEP4 内容ごとのメールブロック ── */
+    .mail-block { margin-bottom: 14px; }
+    .mail-block:last-child { margin-bottom: 0; }
+    .mail-block-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .mail-block-title { font-size: .78rem; font-weight: 700; color: var(--accent); }
+    .mail-empty { color: var(--text3); font-size: .8rem; text-align: center; padding: 20px 0; }
   </style>
 </head>
 <body class="notranslate">
@@ -657,10 +664,9 @@ FOSKIA image 後藤です。</textarea>
       <div class="right-col">
         <div class="card">
           <div class="output-header">
-            <div class="card-title" style="margin-bottom:0">データ送付文面</div>
-            <button class="copy-btn" id="copy-btn-e">コピー</button>
+            <div class="card-title" style="margin-bottom:0">データ送付文面（内容ごとに作成）</div>
           </div>
-          <textarea class="output-textarea" id="output-e" placeholder="STEP 3 で日時を確定してください"></textarea>
+          <div id="output-e-container"></div>
           <button class="tmpl-toggle" id="tmpl-toggle-e">
             <span class="arrow">▶</span>テンプレートを編集
           </button>
@@ -1891,30 +1897,49 @@ FOSKIA image後藤です。</textarea>
       }
     }
 
-    // ── Generate E（STEP4 MAデータ送付文面）─────────
+    // ── Generate E（STEP4 MAデータ送付文面 / 内容ごとに別メール）─
     function regenerateE(){
       saveSession();
       const hdr = document.getElementById('t-header-e').value;
       const body = document.getElementById('t-body-e').value;
       const ftr = document.getElementById('t-footer-e').value;
-      const out = document.getElementById('output-e');
+      const container = document.getElementById('output-e-container');
+      if(!container) return;
+      container.innerHTML = '';
 
       const groups = getContentGroups();
       const contentKeys = sortedContentKeys(groups);
       const filled = contentKeys
         .filter(ck => finalSlots[ck] && finalSlots[ck].start)
         .map(ck => ({ ck, slot: finalSlots[ck] }));
-      if(!filled.length){ out.value = ''; return; }
+      if(!filled.length){
+        container.innerHTML = '<div class="mail-empty">STEP 3 で日時を確定してください</div>';
+        return;
+      }
 
-      const firstSlot = filled[0].slot;
-      const expandedHeader = hasPlaceholders(hdr) ? expandPlaceholders(hdr, firstSlot) : hdr;
-      const expandedFooter = hasPlaceholders(ftr) ? expandPlaceholders(ftr, firstSlot) : ftr;
-      const expandedBodies = filled.map(({ slot }) => expandPlaceholders(body, slot));
-      const parts = [];
-      if(expandedHeader) parts.push(expandedHeader);
-      if(expandedBodies.length) parts.push(expandedBodies.join('\n\n'));
-      if(expandedFooter) parts.push(expandedFooter);
-      out.value = parts.join('\n\n');
+      // 内容（案件）ごとに独立した1通のメール文面を生成
+      filled.forEach(({ ck, slot }) => {
+        const h = hasPlaceholders(hdr) ? expandPlaceholders(hdr, slot) : hdr;
+        const b = expandPlaceholders(body, slot);
+        const f = hasPlaceholders(ftr) ? expandPlaceholders(ftr, slot) : ftr;
+        const mailText = [h, b, f].filter(s => s).join('\n\n');
+
+        const block = document.createElement('div'); block.className = 'mail-block';
+        const head = document.createElement('div'); head.className = 'mail-block-header';
+        const title = document.createElement('span'); title.className = 'mail-block-title';
+        title.textContent = (ck ? `「${ck}」 ` : '') + fmtDate(slot.date);
+        const copyBtn = document.createElement('button'); copyBtn.className = 'copy-btn'; copyBtn.type = 'button'; copyBtn.textContent = 'コピー';
+        const ta = document.createElement('textarea'); ta.className = 'output-textarea'; ta.value = mailText; ta.readOnly = true;
+        copyBtn.addEventListener('click', () => {
+          navigator.clipboard.writeText(ta.value).then(() => {
+            copyBtn.textContent = 'コピーしました'; copyBtn.classList.add('copied');
+            setTimeout(() => { copyBtn.textContent = 'コピー'; copyBtn.classList.remove('copied'); }, 1800);
+          });
+        });
+        head.append(title, copyBtn);
+        block.append(head, ta);
+        container.appendChild(block);
+      });
     }
 
     // STEP4：確定内容のサマリ表示
@@ -1954,7 +1979,7 @@ FOSKIA image後藤です。</textarea>
         });
       });
     }
-    setupCopy('copy-btn-a','output-a'); setupCopy('copy-btn-b','output-b'); setupCopy('copy-btn-c','output-c'); setupCopy('copy-btn-d','output-d'); setupCopy('copy-btn-e','output-e');
+    setupCopy('copy-btn-a','output-a'); setupCopy('copy-btn-b','output-b'); setupCopy('copy-btn-c','output-c'); setupCopy('copy-btn-d','output-d');
 
     // ── Template toggles ─────────────────────────────
     function setupToggle(tid,pid){
@@ -2071,7 +2096,7 @@ FOSKIA image後藤です。</textarea>
       document.getElementById('output-b').value = '';
       document.getElementById('output-c').value = '';
       document.getElementById('output-d').value = '';
-      document.getElementById('output-e').value = '';
+      document.getElementById('output-e-container').innerHTML = '';
       setStepView(1);
       renderCalendar(); renderDateList(); regenerateA();
       if(h.step===4){ setStepView(4); renderTimeEditor(); regenerateB(); validateFinalSlots(); renderFinalPicker(); regenerateC(); regenerateD(); renderStep4Summary(); regenerateE(); }
@@ -2936,7 +2961,7 @@ FOSKIA image後藤です。</textarea>
       document.getElementById('output-b').value='';
       document.getElementById('output-c').value='';
       document.getElementById('output-d').value='';
-      document.getElementById('output-e').value='';
+      document.getElementById('output-e-container').innerHTML='';
       renderCalendar(); renderDateList(); regenerateA();
     }
     // 履歴ごと削除して初期化
