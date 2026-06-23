@@ -304,6 +304,16 @@
     .mail-block-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
     .mail-block-title { font-size: .78rem; font-weight: 700; color: var(--accent); }
     .mail-empty { color: var(--text3); font-size: .8rem; text-align: center; padding: 20px 0; }
+
+    /* ── STEP4 送付内容＋URL入力（内容ごと）── */
+    .step4-item { background: var(--surface2); border: 1px solid var(--border); border-radius: 9px; padding: 11px 13px; margin-bottom: 8px; }
+    .step4-item:last-child { margin-bottom: 0; }
+    .step4-item .final-date { font-size: .88rem; font-weight: 700; }
+    .step4-item .final-time { font-size: .75rem; color: var(--text2); margin-top: 2px; }
+    .step4-url-wrap { margin-top: 8px; }
+    .step4-url-wrap label { display: block; font-size: .65rem; color: var(--text3); font-weight: 600; margin-bottom: 4px; }
+    .step4-url-input { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: .78rem; padding: 6px 10px; font-family: inherit; outline: none; transition: border-color .15s; }
+    .step4-url-input:focus { border-color: var(--accent); }
   </style>
 </head>
 <body class="notranslate">
@@ -652,13 +662,9 @@ FOSKIA image 後藤です。</textarea>
   <div id="step4" style="display:none">
     <div class="layout s2">
       <div class="card">
-        <div class="card-title">送付内容の確認</div>
-        <div class="final-hint">STEP 3 で確定した日時・場所・ルーム・内容を参照します。下にギガファイル便などのURLを貼り付けてください。</div>
+        <div class="card-title">送付内容の確認・ファイルURL</div>
+        <div class="final-hint">確定した内容ごとに、ギガファイル便などのURLを貼り付けてください。各内容が別々のメールになります。</div>
         <div id="step4-summary"></div>
-        <div class="field" style="margin-top:14px">
-          <label>ファイルURL（任意）</label>
-          <input type="text" id="file-url" class="subject-proj-input" placeholder="例：https://xxx.gigafile.nu/...">
-        </div>
       </div>
 
       <div class="right-col">
@@ -1011,7 +1017,7 @@ FOSKIA image後藤です。</textarea>
     let locationName = ''; // 場所名（任意）— {location} に展開
     let taskDurations = {}; // { contentName: minutes } — タスクごとの内容別所要時間
     let projectName = ''; // 案件名（件名の【】内に入る）
-    let fileUrl = ''; // STEP4 のファイルURL（{fileurl} に展開）
+    // STEP4 のファイルURLは finalSlots[ck].fileUrl に内容ごと保持
     let finalSlots = {}; // { contentKey: { date, start, end } } — STEP 3 で内容ごとに確定した日時
 
     function dateKey(y,m,d){ return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
@@ -1045,7 +1051,7 @@ FOSKIA image後藤です。</textarea>
         .replace(/\{surname\}/g, surname)
         .replace(/\{content\}/g, slotContent)
         .replace(/\{narout\}/g, safe.narOut || '')
-        .replace(/\{fileurl\}/g, fileUrl || '');
+        .replace(/\{fileurl\}/g, safe.fileUrl || '');
       out = out.replace(/\{(start|end)([+\-＋－])(\d+)\}/g, (m, base, sign, n) => {
         const baseTime = base === 'start' ? startTime : endTime;
         if(!baseTime) return '';
@@ -1957,14 +1963,22 @@ FOSKIA image後藤です。</textarea>
         return;
       }
       filled.forEach(({ ck, slot }) => {
-        const item = document.createElement('div'); item.className = 'final-item';
-        const info = document.createElement('div'); info.className = 'final-info';
+        const item = document.createElement('div'); item.className = 'step4-item';
         const dd = document.createElement('div'); dd.className = 'final-date';
         dd.textContent = `${fmtDate(slot.date)} ${slot.start}〜`;
         const dt = document.createElement('div'); dt.className = 'final-time';
         const roomTxt = (slot.room !== undefined && slot.room !== null && slot.room !== '') ? `MA-${slot.room}` : 'ルーム未設定';
         dt.textContent = `${locationName || '場所未設定'} ${roomTxt}${ck ? ' / ' + ck : ''}`;
-        info.append(dd, dt); item.appendChild(info);
+        item.append(dd, dt);
+        // 内容ごとのファイルURL入力
+        const urlWrap = document.createElement('div'); urlWrap.className = 'step4-url-wrap';
+        const label = document.createElement('label'); label.textContent = 'ファイルURL';
+        const inp = document.createElement('input'); inp.type = 'text'; inp.className = 'step4-url-input';
+        inp.placeholder = '例：https://xxx.gigafile.nu/...';
+        inp.value = slot.fileUrl || '';
+        inp.addEventListener('input', () => { slot.fileUrl = inp.value; saveSession(); regenerateE(); });
+        urlWrap.append(label, inp);
+        item.appendChild(urlWrap);
         c.appendChild(item);
       });
     }
@@ -2030,7 +2044,6 @@ FOSKIA image後藤です。</textarea>
         locationName,
         taskDurations,
         projectName,
-        fileUrl,
         finalSlots,
         step,
         duration: gv('s-duration'),
@@ -2062,8 +2075,6 @@ FOSKIA image後藤です。</textarea>
       if(!locationName){ const ld=getLocationDefault(); if(ld && getLocationPresets().includes(ld)) locationName=ld; }
       taskDurations = h.taskDurations || {};
       projectName = h.projectName || '';
-      fileUrl = h.fileUrl || '';
-      document.getElementById('file-url').value = fileUrl;
       // 履歴に案件名がなければ（旧データ等）デフォルトを適用
       if(!projectName){
         const pDef = getProjectDefault();
@@ -2088,6 +2099,10 @@ FOSKIA image後藤です。</textarea>
         finalSlots = { [ck]: h.finalSlot };
       } else {
         finalSlots = {};
+      }
+      // 旧データ互換：グローバルfileUrlを各slotに移行（slot側が未設定なら）
+      if(h.fileUrl){
+        Object.values(finalSlots).forEach(s => { if(s && !s.fileUrl) s.fileUrl = h.fileUrl; });
       }
       refreshContactList();
       setv('s-duration', h.duration ?? '60');
@@ -2947,10 +2962,8 @@ FOSKIA image後藤です。</textarea>
       locationName = '';
       taskDurations = {};
       projectName = '';
-      fileUrl = '';
       document.getElementById('proj-a').value = '';
       document.getElementById('proj-b').value = '';
-      document.getElementById('file-url').value = '';
       finalSlots = {};
       refreshContactList();
       refreshRoomList();
@@ -2986,10 +2999,6 @@ FOSKIA image後藤です。</textarea>
     document.getElementById('to-step4').addEventListener('click', enterStep4);
     document.getElementById('to-step3-back').addEventListener('click', exitStep4);
     document.getElementById('finish-btn').addEventListener('click', finishTask);
-    document.getElementById('file-url').addEventListener('input', () => {
-      fileUrl = document.getElementById('file-url').value;
-      regenerateE();
-    });
     document.getElementById('new-task-btn').addEventListener('click', newTask);
     document.getElementById('hist-btn').addEventListener('click', openHistModal);
     document.getElementById('hist-close').addEventListener('click', closeHistModal);
