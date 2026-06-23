@@ -769,8 +769,8 @@ FOSKIA image後藤です。</textarea>
     // ── テンプレート設定の共有 ────────────────────────
     // エクスポート/インポート対象のlocalStorageキー
     const PRESET_KEYS = [
-      'tmpl_presets_a','tmpl_presets_b','tmpl_presets_c','tmpl_presets_d',
-      'tmpl_default_a','tmpl_default_b','tmpl_default_c','tmpl_default_d',
+      'tmpl_presets_a','tmpl_presets_b','tmpl_presets_c','tmpl_presets_d','tmpl_presets_e',
+      'tmpl_default_a','tmpl_default_b','tmpl_default_c','tmpl_default_d','tmpl_default_e',
       'tmpl_current',
       'contact_presets','contact_default',
       'content_presets','content_default',
@@ -2516,15 +2516,15 @@ FOSKIA image後藤です。</textarea>
       document.getElementById('loc-sel').addEventListener('change', e => {
         locationName = e.target.value;
         updateLocationBtnState(); updateLocationDefaultBtn();
-        regenerateC(); regenerateD();
+        regenerateC(); regenerateD(); regenerateE();
       });
       document.getElementById('loc-add').addEventListener('click', () => {
         const val = (prompt('場所を入力してください（例：EXタワープラスビル）')||'').trim();
         if(!val) return;
         const arr = getLocationPresets();
-        if(arr.includes(val)){ alert('同じ場所が既に保存されています'); locationName = val; refreshLocationList(); regenerateC(); regenerateD(); return; }
+        if(arr.includes(val)){ alert('同じ場所が既に保存されています'); locationName = val; refreshLocationList(); regenerateC(); regenerateD(); regenerateE(); return; }
         arr.push(val); setLocationPresets(arr);
-        locationName = val; refreshLocationList(); regenerateC(); regenerateD();
+        locationName = val; refreshLocationList(); regenerateC(); regenerateD(); regenerateE();
       });
       document.getElementById('loc-rename').addEventListener('click', () => {
         const cur = document.getElementById('loc-sel').value;
@@ -2538,7 +2538,7 @@ FOSKIA image後藤です。</textarea>
         setLocationPresets(arr);
         if(locationName === cur) locationName = newVal;
         if(getLocationDefault() === cur) setLocationDefaultVal(newVal);
-        refreshLocationList(); regenerateC(); regenerateD();
+        refreshLocationList(); regenerateC(); regenerateD(); regenerateE();
       });
       document.getElementById('loc-default').addEventListener('click', () => {
         const cur = document.getElementById('loc-sel').value;
@@ -2555,7 +2555,7 @@ FOSKIA image後藤です。</textarea>
         setLocationPresets(arr);
         if(locationName === cur) locationName = '';
         if(getLocationDefault() === cur) setLocationDefaultVal(null);
-        refreshLocationList(); regenerateC(); regenerateD();
+        refreshLocationList(); regenerateC(); regenerateD(); regenerateE();
       });
     }
 
@@ -2985,9 +2985,7 @@ FOSKIA image後藤です。</textarea>
     }
     // 新規作成（現在のタスクは履歴に残したまま新しいタスク開始）
     function newTask(){
-      if(activeHistoryId && Object.keys(selected).length){
-        // 現状を保存してから切り替え（saveSessionは別IDで上書きしないよう activeHistoryId をクリア後にやる）
-      }
+      // 現タスクは直近の saveSession で履歴保存済み。状態をリセットして新規開始。
       resetState();
     }
 
